@@ -1,0 +1,287 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User and Authentication
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          String    @default("user") // owner, admin, editor, viewer
+  teamId        String?
+  team          Team?     @relation(fields: [teamId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  campaigns     Campaign[]
+  insights      Insight[]
+}
+
+model Team {
+  id            String    @id @default(cuid())
+  name          String
+  companyName   String
+  brandConfigId String?   @unique
+  brandConfig   BrandConfig? @relation(fields: [brandConfigId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  users         User[]
+  channels      Channel[]
+}
+
+// Marketplace Channels
+model Channel {
+  id            String    @id @default(cuid())
+  type          String    // shopee, tokopedia, tiktok, lazada, bukalapak, blibli
+  name          String
+  teamId        String
+  team          Team      @relation(fields: [teamId], references: [id])
+  apiKey        String?
+  apiSecret     String?
+  shopId        String?
+  connected     Boolean   @default(false)
+  lastSync      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  listings      Listing[]
+  orders        Order[]
+}
+
+// Products and Inventory
+model Product {
+  id            String    @id @default(cuid())
+  name          String
+  sku           String    @unique
+  description   String?
+  category      String
+  price         Float
+  cost          Float
+  images        String    // JSON array of image URLs
+  variants      String?   // JSON array of variants
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  inventory     Inventory[]
+  listings      Listing[]
+  orderItems    OrderItem[]
+  bundleItems   BundleItem[]
+}
+
+model Inventory {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  channelType   String    // shopee, tokopedia, warehouse, etc
+  quantity      Int
+  reorderPoint  Int
+  lastRestocked DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([productId, channelType])
+}
+
+model Listing {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  channelId     String
+  channel       Channel   @relation(fields: [channelId], references: [id])
+  status        String    @default("draft") // active, draft, inactive, error
+  price         Float
+  views         Int       @default(0)
+  syncStatus    String    @default("pending") // synced, pending, error
+  lastUpdated   DateTime  @default(now())
+  url           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([productId, channelId])
+}
+
+// Orders
+model Order {
+  id            String    @id @default(cuid())
+  orderId       String    @unique
+  channelId     String
+  channel       Channel   @relation(fields: [channelId], references: [id])
+  customerName  String
+  customerEmail String?
+  customerPhone String?
+  customerAddress String
+  subtotal      Float
+  shipping      Float
+  total         Float
+  status        String    @default("pending") // pending, processing, shipped, delivered, cancelled
+  paymentMethod String
+  trackingNumber String?
+  notes         String?
+  orderDate     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id            String    @id @default(cuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id])
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  quantity      Int
+  price         Float
+  createdAt     DateTime  @default(now())
+}
+
+// Campaigns and Marketing
+model Campaign {
+  id            String    @id @default(cuid())
+  name          String
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  status        String    @default("draft") // active, paused, completed, draft
+  channels      String    // JSON array of channel IDs
+  budget        Float
+  spent         Float     @default(0)
+  objective     String
+  autoOptimize  Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  experiments   Experiment[]
+}
+
+model Experiment {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      Campaign  @relation(fields: [campaignId], references: [id])
+  name          String
+  variant       String    // A or B
+  metrics       String    // JSON with impressions, clicks, conversions, etc
+  status        String    @default("running") // running, completed, paused
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Bundles
+model Bundle {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  originalPrice Float
+  bundlePrice   Float
+  discount      Float
+  margin        Float
+  status        String    @default("draft") // active, draft, paused
+  rationale     String
+  habitPairing  String
+  channels      String    // JSON array of channels
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  items         BundleItem[]
+}
+
+model BundleItem {
+  id            String    @id @default(cuid())
+  bundleId      String
+  bundle        Bundle    @relation(fields: [bundleId], references: [id])
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  quantity      Int
+  createdAt     DateTime  @default(now())
+}
+
+// Intelligence and Insights
+model Insight {
+  id            String    @id @default(cuid())
+  type          String    // competitor, trend, product, campaign
+  title         String
+  description   String
+  data          String    // JSON data
+  source        String
+  impact        String    // high, medium, low
+  actionable    String
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Email Marketing
+model EmailFlow {
+  id            String    @id @default(cuid())
+  name          String
+  type          String    // welcome, abandoned_cart, post_purchase, win_back, custom
+  status        String    @default("draft") // active, draft, paused
+  emails        Int       @default(0)
+  avgOpenRate   Float     @default(0)
+  avgClickRate  Float     @default(0)
+  revenue       Float     @default(0)
+  subscribers   Int       @default(0)
+  flow          String    // JSON array of email steps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Segment {
+  id            String    @id @default(cuid())
+  name          String
+  criteria      String    // JSON array of criteria
+  size          Int       @default(0)
+  growthRate    Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Chatbot
+model Faq {
+  id            String    @id @default(cuid())
+  question      String
+  answer        String
+  category      String
+  usage         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Settings
+model BrandConfig {
+  id            String    @id @default(cuid())
+  companyName   String
+  brandVoice    String    @default("friendly") // professional, friendly, casual, energetic
+  defaultLanguage String  @default("id") // id, en
+  timezone      String    @default("Asia/Jakarta")
+  currency      String    @default("IDR")
+  autoTranslate Boolean   @default(true)
+  complianceMode String   @default("strict") // strict, moderate, relaxed
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  team          Team?
+}
+
+// Analytics
+model MetricSnapshot {
+  id            String    @id @default(cuid())
+  date          DateTime
+  metric        String    // revenue, orders, customers, etc
+  value         Float
+  dimension     String?   // channel, product, campaign, etc
+  dimensionValue String?
+  createdAt     DateTime  @default(now())
+  
+  @@index([date, metric])
+}

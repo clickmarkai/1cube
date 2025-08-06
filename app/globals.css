@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #C75D2C;
+    --color-primary-medium: #D96F32;
+    --color-primary-light: #F8B259;
+    --color-primary-lighter: #F3E9DC;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors px-4 py-2;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-medium;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-primary-lighter text-primary hover:bg-primary-light;
+  }
+  
+  .btn-outline {
+    @apply btn border border-primary text-primary hover:bg-primary hover:text-white;
+  }
+  
+  .card {
+    @apply rounded-lg border border-gray-200 bg-white p-6 shadow-sm;
+  }
+}
