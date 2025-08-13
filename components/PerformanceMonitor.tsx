@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 
 export function PerformanceMonitor() {
   const pathname = usePathname();
-  const navigationStartRef = useRef<number>();
+  const navigationStartRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     // Track navigation start

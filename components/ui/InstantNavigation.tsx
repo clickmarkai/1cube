@@ -12,7 +12,7 @@ interface InstantNavProps {
 
 export function InstantNav({ href, children, className, onClick }: InstantNavProps) {
   const router = useRouter();
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Prefetch on mount and hover
   useEffect(() => {

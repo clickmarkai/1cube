@@ -1,32 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Optimize for faster navigation
-  experimental: {
-    // Enable optimistic navigation
-    optimisticClientCache: true,
-  },
+  // Netlify deployment configuration
+  trailingSlash: true,
   
   // Optimize images and assets
   images: {
-    unoptimized: true, // For faster dev builds
+    unoptimized: true, // Required for static export
   },
   
-  // Reduce bundle size
-  swcMinify: true,
+  // Reduce bundle size (swcMinify is deprecated, SWC is default now)
   
-  // Enable faster refresh
-  reactStrictMode: false, // Disable for faster dev
+  // Enable React strict mode for production
+  reactStrictMode: true,
   
-  // Optimize redirects
-  async redirects() {
-    return [
-      {
-        source: '/app/creatives-lab',
-        destination: '/app/creatives-lab',
-        permanent: false,
-      },
-    ];
-  },
+  // Redirects are handled by netlify.toml for static export
   
   // Performance optimizations
   poweredByHeader: false,

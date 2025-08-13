@@ -5,8 +5,8 @@ import { useEffect, useRef } from 'react';
 
 export function NavigationDebugger() {
   const pathname = usePathname();
-  const previousPathnameRef = useRef<string>();
-  const routeChangeStartRef = useRef<number>();
+  const previousPathnameRef = useRef<string | undefined>(undefined);
+  const routeChangeStartRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const currentTime = performance.now();

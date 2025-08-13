@@ -3,10 +3,9 @@ import { z } from "zod";
 import { mockChatbotIntents } from "@/lib/mock-data";
 
 const intentSchema = z.object({
-  name: z.string().min(1),
+  intent: z.string().min(1),
   examples: z.array(z.string()).min(1),
   response: z.string().min(1),
-  category: z.string(),
 });
 
 export async function GET() {
@@ -17,7 +16,7 @@ export async function GET() {
       metadata: {
         total: mockChatbotIntents.length,
         totalUsage: mockChatbotIntents.reduce((sum, i) => sum + i.usage, 0),
-        categories: [...new Set(mockChatbotIntents.map(i => i.category))],
+        intents: [...new Set(mockChatbotIntents.map(i => i.intent))],
       },
     });
   } catch (error) {

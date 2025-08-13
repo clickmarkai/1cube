@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 
 export async function POST(
   request: Request,
-  { params }: { params: { channelId: string } }
+  { params }: { params: Promise<{ channelId: string }> }
 ) {
   try {
-    const { channelId } = params;
+    const { channelId } = await params;
 
     // Simulate sync process
     const syncResult = {
