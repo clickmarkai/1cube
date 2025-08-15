@@ -5,6 +5,7 @@ import {
   Store, Users, Globe, Bell, Shield, CreditCard, Key, 
   Check, X, Plus, Settings as SettingsIcon, Save 
 } from "lucide-react";
+import { generateShopeeAuthLink } from "@/app/api/settings/auth";
 
 type TabType = "channels" | "team" | "brand" | "billing" | "security";
 
@@ -36,7 +37,7 @@ export default function SettingsPage() {
 
   // Channel Management State
   const [channels, setChannels] = useState<Channel[]>([
-    { id: "shopee", name: "Shopee", icon: "🛍️", connected: true, lastSync: new Date(Date.now() - 3600000) },
+    { id: "shopee", name: "Shopee", icon: "🛍️", connected: false, lastSync: new Date(Date.now() - 3600000) },
     { id: "tokopedia", name: "Tokopedia", icon: "🟢", connected: true, lastSync: new Date(Date.now() - 7200000) },
     { id: "tiktok", name: "TikTok Shop", icon: "📱", connected: false },
     { id: "lazada", name: "Lazada", icon: "🔵", connected: false },
@@ -115,12 +116,15 @@ export default function SettingsPage() {
                 <button 
                   className="btn-primary px-4 py-2"
                   onClick={() => {
-                    // Simulate connection
-                    const updatedChannels = channels.map(ch => 
-                      ch.id === channel.id ? { ...ch, connected: true, lastSync: new Date() } : ch
-                    );
-                    setChannels(updatedChannels);
-                    setHasChanges(true);
+                    if (channel.id === "shopee") {
+                      window.location.href = generateShopeeAuthLink();
+                    } else {
+                      const updatedChannels = channels.map(ch => 
+                        ch.id === channel.id ? { ...ch, connected: true, lastSync: new Date() } : ch
+                      );
+                      setChannels(updatedChannels);
+                      setHasChanges(true);
+                    }
                   }}
                 >
                   Connect
