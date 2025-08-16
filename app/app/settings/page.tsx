@@ -5,7 +5,7 @@ import {
   Store, Users, Globe, Bell, Shield, CreditCard, Key, 
   Check, X, Plus, Settings as SettingsIcon, Save 
 } from "lucide-react";
-import { generateShopeeAuthLink } from "@/app/api/settings/auth";
+import { generateShopeeAuthLink } from "@/app/api/settings/shopee/auth";
 
 type TabType = "channels" | "team" | "brand" | "billing" | "security";
 
