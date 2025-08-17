@@ -143,7 +143,7 @@ const mockListings: Listing[] = [
 ];
 
 const channels = [
-  { id: "shopee", name: "Shopee", icon: "🛍️", color: "bg-orange-500" },
+  { id: "shopee", name: "shopee", icon: "🛍️", color: "bg-orange-500" },
   { id: "tokopedia", name: "Tokopedia", icon: "🟢", color: "bg-green-500" },
   { id: "tiktok", name: "TikTok Shop", icon: "📱", color: "bg-black" },
   { id: "lazada", name: "Lazada", icon: "🔵", color: "bg-blue-600" },

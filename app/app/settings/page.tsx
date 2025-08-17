@@ -1,26 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { 
   Store, Users, Globe, Bell, Shield, CreditCard, Key, 
-  Check, X, Plus, Settings as SettingsIcon, Save 
+  Check, X, Plus, Settings as SettingsIcon, Save, AlertCircle 
 } from "lucide-react";
-import { generateShopeeAuthLink } from "@/app/api/settings/shopee/auth";
+import { generateChannelAuthLink } from "@/lib/channels";
+import { getChannelsByUserId, updateChannelConnectionByName as updateChannelConnectionService } from "@/lib/channels-service";
+import { type Channel } from "@/lib/channels";
 
-type TabType = "channels" | "team" | "brand" | "billing" | "security";
-
-interface Channel {
-  id: string;
-  name: string;
-  icon: string;
-  connected: boolean;
-  lastSync?: Date;
-  credentials?: {
-    apiKey?: string;
-    apiSecret?: string;
-    shopId?: string;
+// Mock session hook - replace with real NextAuth session later
+function useCurrentUser() {
+  // This would be replaced with: const { data: session } = useSession();
+  return {
+    user: {
+      id: "1", // Demo user ID - matches our database
+      name: "Demo User",
+      email: "demo@1cube.id"
+    }
   };
 }
+
+type TabType = "channels" | "team" | "brand" | "billing" | "security";
 
 interface TeamMember {
   id: string;
@@ -34,22 +36,19 @@ interface TeamMember {
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("channels");
   const [hasChanges, setHasChanges] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const searchParams = useSearchParams();
+  const { user } = useCurrentUser();
 
   // Channel Management State
-  const [channels, setChannels] = useState<Channel[]>([
-    { id: "shopee", name: "Shopee", icon: "🛍️", connected: false, lastSync: new Date(Date.now() - 3600000) },
-    { id: "tokopedia", name: "Tokopedia", icon: "🟢", connected: true, lastSync: new Date(Date.now() - 7200000) },
-    { id: "tiktok", name: "TikTok Shop", icon: "📱", connected: false },
-    { id: "lazada", name: "Lazada", icon: "🔵", connected: false },
-    { id: "bukalapak", name: "Bukalapak", icon: "🔴", connected: false },
-    { id: "blibli", name: "Blibli", icon: "🟦", connected: false },
-  ]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(true);
 
   // Team Management State
   const [teamMembers] = useState<TeamMember[]>([
-    { id: "1", name: "Demo User", email: "demo@1cube.id", role: "owner", joinedAt: new Date() },
-    { id: "2", name: "Sarah Marketing", email: "sarah@company.id", role: "admin", joinedAt: new Date(Date.now() - 86400000 * 30) },
-    { id: "3", name: "Budi Content", email: "budi@company.id", role: "editor", joinedAt: new Date(Date.now() - 86400000 * 15) },
+    { id: "1", name: "Demo User", email: "demo@1cube.id", role: "owner", joinedAt: new Date('2025-01-17T00:00:00Z') },
+    { id: "2", name: "Sarah Marketing", email: "sarah@company.id", role: "admin", joinedAt: new Date('2024-12-18T00:00:00Z') },
+    { id: "3", name: "Budi Content", email: "budi@company.id", role: "editor", joinedAt: new Date('2025-01-02T00:00:00Z') },
   ]);
 
   // Brand Settings State
@@ -71,6 +70,93 @@ export default function SettingsPage() {
     { id: "security" as TabType, name: "Security", icon: Shield },
   ];
 
+  const fetchChannels = async () => {
+    try {
+      if (!user?.id) {
+        setMessage({ type: 'error', text: 'User not authenticated' });
+        setIsLoadingChannels(false);
+        return;
+      }
+
+      setIsLoadingChannels(true);
+      const result = await getChannelsByUserId(user.id);
+      
+      if (result.success && result.data) {
+        setChannels(result.data);
+      } else {
+        console.error('Failed to fetch channels:', result.error);
+        setMessage({ type: 'error', text: 'Failed to load channels' });
+      }
+    } catch (error) {
+      console.error('Error fetching channels:', error);
+      setMessage({ type: 'error', text: 'Failed to load channels' });
+    } finally {
+      setIsLoadingChannels(false);
+    }
+  };
+
+  const updateChannelConnection = async (channelName: string, connected: boolean) => {
+    try {
+      if (!user?.id) {
+        setMessage({ type: 'error', text: 'User not authenticated' });
+        return false;
+      }
+
+      const result = await updateChannelConnectionService(
+        user.id,
+        channelName, 
+        connected, 
+        connected ? new Date() : undefined
+      );
+      
+      if (result.success && result.data) {
+        // Always refresh channels to get the updated state
+        await fetchChannels();
+        setHasChanges(true);
+        return true;
+      } else {
+        console.error('Failed to update channel:', result.error);
+        setMessage({ type: 'error', text: 'Failed to update channel connection' });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating channel:', error);
+      setMessage({ type: 'error', text: 'Failed to update channel connection' });
+      return false;
+    }
+  };
+  
+  useEffect(() => {
+    if (user?.id) {
+      fetchChannels();
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const errorMessage = searchParams.get('error_message');
+    const success = searchParams.get('success');
+    const successMessage = searchParams.get('success_message');
+
+    if (error && errorMessage) {
+      setMessage({ type: 'error', text: errorMessage });
+    } else if (success && successMessage) {
+      setMessage({ type: 'success', text: successMessage });
+      if (success === 'Shopee_connected') {
+        fetchChannels();
+      }
+    }
+
+    if (error || success) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      newUrl.searchParams.delete('error_message');
+      newUrl.searchParams.delete('success');
+      newUrl.searchParams.delete('success_message');
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+  }, [searchParams]);
+
   const handleSave = () => {
     // Simulate saving
     setTimeout(() => {
@@ -86,8 +172,14 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-600">Connect your marketplace accounts to sync products, orders, and inventory</p>
       </div>
 
-      <div className="grid gap-4">
-        {channels.map((channel) => (
+      {isLoadingChannels ? (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Loading channels...</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {channels.map((channel) => (
           <div key={channel.id} className="card">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -108,22 +200,29 @@ export default function SettingsPage() {
                     <Check className="h-4 w-4 mr-1" />
                     Connected
                   </span>
-                  <button className="btn-outline px-3 py-1 text-sm">
-                    Configure
+                  <button 
+                    className="btn-outline px-3 py-1 text-sm"
+                    onClick={async () => {
+                      await updateChannelConnection(channel.name, false);
+                    }}
+                  >
+                    Disconnect
                   </button>
                 </div>
               ) : (
                 <button 
                   className="btn-primary px-4 py-2"
-                  onClick={() => {
-                    if (channel.id === "shopee") {
-                      window.location.href = generateShopeeAuthLink();
+                  onClick={async () => {  
+                    if (channel.name === "shopee") {
+                      const { authLink, state } = generateChannelAuthLink('shopee', {
+                        userId: user.id
+                      });
+                      
+                      document.cookie = `shopee_auth_state=${state}; path=/; max-age=600; secure; samesite=strict`;
+                      
+                      window.location.href = authLink;
                     } else {
-                      const updatedChannels = channels.map(ch => 
-                        ch.id === channel.id ? { ...ch, connected: true, lastSync: new Date() } : ch
-                      );
-                      setChannels(updatedChannels);
-                      setHasChanges(true);
+                      await updateChannelConnection(channel.name, true);
                     }
                   }}
                 >
@@ -133,7 +232,8 @@ export default function SettingsPage() {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       <div className="card bg-primary-lighter">
         <h4 className="font-semibold mb-2">🔗 Additional Integrations</h4>
@@ -503,6 +603,28 @@ export default function SettingsPage() {
           </button>
         )}
       </div>
+
+      {/* Success/Error Messages */}
+      {message && (
+        <div className={`p-4 rounded-lg flex items-center ${
+          message.type === 'success' 
+            ? 'bg-green-50 border border-green-200 text-green-800' 
+            : 'bg-red-50 border border-red-200 text-red-800'
+        }`}>
+          {message.type === 'success' ? (
+            <Check className="h-5 w-5 mr-3 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-5 w-5 mr-3 flex-shrink-0" />
+          )}
+          <span>{message.text}</span>
+          <button 
+            onClick={() => setMessage(null)}
+            className="ml-auto text-current hover:opacity-70"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b">

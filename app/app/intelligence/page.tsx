@@ -41,7 +41,7 @@ export default function IntelligencePage() {
 
   const platforms = [
     { id: "all", name: "All Platforms", icon: "🌐" },
-    { id: "shopee", name: "Shopee", icon: "🛍️" },
+    { id: "shopee", name: "shopee", icon: "🛍️" },
     { id: "tokopedia", name: "Tokopedia", icon: "🟢" },
     { id: "tiktok", name: "TikTok", icon: "📱" },
     { id: "instagram", name: "Instagram", icon: "📸" },
