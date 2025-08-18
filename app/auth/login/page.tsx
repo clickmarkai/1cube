@@ -1,35 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Mail, Lock, Chrome } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
+  useEffect(() => {
+    const messageParam = searchParams.get('message');
+    if (messageParam) {
+      setMessage(messageParam);
+    }
+  }, [searchParams]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError("");
     
-    // Mock login - in production this would use NextAuth
-    setTimeout(() => {
-      router.push("/app");
-    }, 1000);
+    try {
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Invalid email or password");
+      } else if (result?.ok) {
+        // Persist minimal session in localStorage for client routing
+        localStorage.setItem(
+          "session",
+          JSON.stringify({ email: formData.email, loggedInAt: Date.now() })
+        );
+        router.push("/app");
+      }
+    } catch (error) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleOAuthLogin = (provider: string) => {
-    setIsLoading(true);
-    // Mock OAuth login
-    setTimeout(() => {
-      router.push("/app");
-    }, 1000);
-  };
+  // If a session exists already, avoid showing login
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("session") : null;
+      if (raw) {
+        router.replace("/app");
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-lighter via-white to-primary-light flex items-center justify-center px-4">
@@ -39,6 +73,18 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold text-primary mb-2">Welcome back to 1Cube</h1>
             <p className="text-gray-600">Login to your AI-powered ecommerce dashboard</p>
           </div>
+
+          {message && (
+            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded mb-6">
+              {message}
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-6">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
@@ -67,24 +113,35 @@ export default function LoginPage() {
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
-                  className="input pl-10"
+                  className="input pl-10 pr-10"
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("Login password toggle clicked, current state:", showPassword);
+                    setShowPassword(prev => {
+                      console.log("Changing login password visibility from", prev, "to", !prev);
+                      return !prev;
+                    });
+                  }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none z-20 bg-white p-1 rounded transition-colors cursor-pointer"
+                  style={{ minWidth: '28px', minHeight: '28px' }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
-                <input type="checkbox" className="mr-2" />
-                <span className="text-sm text-gray-600">Remember me</span>
-              </label>
-              <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">
-                Forgot password?
-              </Link>
             </div>
 
             <button
@@ -96,38 +153,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                onClick={() => handleOAuthLogin("google")}
-                disabled={isLoading}
-                className="btn-outline w-full py-3 flex items-center justify-center"
-              >
-                <Chrome className="h-5 w-5 mr-2" />
-                Google
-              </button>
-              <button
-                onClick={() => handleOAuthLogin("facebook")}
-                disabled={isLoading}
-                className="btn-outline w-full py-3 flex items-center justify-center"
-              >
-                <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                </svg>
-                Meta
-              </button>
-            </div>
-          </div>
-
           <p className="mt-8 text-center text-sm text-gray-600">
             Don&apos;t have an account?{" "}
             <Link href="/auth/register" className="font-medium text-primary hover:underline">
@@ -135,10 +160,6 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-
-        <p className="mt-4 text-center text-xs text-gray-500">
-          Demo credentials: demo@1cube.id / demo123
-        </p>
       </div>
     </div>
   );

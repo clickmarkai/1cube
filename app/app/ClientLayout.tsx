@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { InstantNav } from "../../components/ui/InstantNavigation";
 import { usePrefetchRoutes } from "../../hooks/usePrefetchRoutes";
 import { PerformanceMonitor } from "../../components/PerformanceMonitor";
@@ -47,6 +47,7 @@ const navigation = [
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   
@@ -55,11 +56,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // Prefetch all routes for instant navigation
   usePrefetchRoutes();
 
-  const currentUser = {
-    name: "Demo User",
-    email: "demo@1cube.id",
-    company: "Wellness Brand Co",
-  };
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; company?: string } | null>(null);
+
+  // Guard: redirect to login if no session in localStorage
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("session") : null;
+      if (!raw) {
+        router.replace("/auth/login");
+        return;
+      }
+      const session = JSON.parse(raw);
+      setCurrentUser({ name: session.email?.split("@")[0] || "User", email: session.email });
+    } catch {
+      router.replace("/auth/login");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -117,8 +130,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <User className="h-5 w-5 text-primary" />
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-900">{currentUser.name}</p>
-              <p className="text-xs text-gray-500">{currentUser.company}</p>
+              <p className="text-sm font-medium text-gray-900">{currentUser?.name ?? "User"}</p>
+              <p className="text-xs text-gray-500">{currentUser?.company ?? ""}</p>
             </div>
           </div>
         </div>
@@ -138,7 +151,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
             <div className="flex-1 px-4">
               <p className="text-sm text-gray-500">
-                Welcome back, {currentUser.name}
+                Welcome back, {currentUser?.name ?? "User"}
               </p>
             </div>
 
@@ -171,7 +184,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         Settings
                       </InstantNav>
                       <button
-                        onClick={() => window.location.href = "/auth/login"}
+                        onClick={() => {
+                          try { localStorage.removeItem("session"); } catch {}
+                          window.location.href = "/auth/login";
+                        }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         <LogOut className="inline-block h-4 w-4 mr-2" />

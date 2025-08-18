@@ -1,18 +1,9 @@
 import NextAuth from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 
 const handler = NextAuth({
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-    }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID || "",
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || "",
-    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -20,19 +11,58 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        // Mock authentication - replace with real auth logic
-        if (
-          credentials?.email === "demo@1cube.id" &&
-          credentials?.password === "demo123"
-        ) {
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
+        try {
+          // Fetch user from Supabase
+          const supabaseUrl = "https://diubdforaeqzbtbwxdfc.supabase.co";
+          const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdWJkZm9yYWVxemJ0Ynd4ZGZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3NDc4NDUsImV4cCI6MjA3MDMyMzg0NX0.W9kNfkg3HE_fjIWlCggY2qcButBKUvBCsNQ8955CY1I";
+
+          const response = await fetch(
+            `${supabaseUrl}/rest/v1/users?email=eq.${credentials.email}&select=id,email,password_hash`,
+            {
+              headers: {
+                "apikey": supabaseKey,
+                "Authorization": `Bearer ${supabaseKey}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          const users = await response.json();
+          
+          if (users.length === 0) {
+            return null;
+          }
+
+          const user = users[0];
+          
+          // Check if password_hash exists
+          if (!user.password_hash) {
+            console.error("No password hash found for user:", user.email);
+            return null;
+          }
+          
+          // Verify password
+          const isValidPassword = await bcrypt.compare(credentials.password, user.password_hash);
+          
+          if (!isValidPassword) {
+            console.error("Password verification failed for user:", user.email);
+            return null;
+          }
+
           return {
-            id: "1",
-            name: "Demo User",
-            email: "demo@1cube.id",
+            id: user.id,
+            email: user.email,
+            name: user.email.split('@')[0], // Use email prefix as name
             image: null,
           };
+        } catch (error) {
+          console.error("Authentication error:", error);
+          return null;
         }
-        return null;
       },
     }),
   ],

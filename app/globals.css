@@ -17,15 +17,23 @@
   }
   
   .btn-primary {
-    @apply btn bg-primary text-white hover:bg-primary-medium;
+    @apply btn bg-[#C75D2C] text-white hover:bg-[#D96F32] focus:ring-2 focus:ring-[#C75D2C] focus:ring-offset-2;
   }
   
   .btn-secondary {
-    @apply btn bg-primary-lighter text-primary hover:bg-primary-light;
+    @apply btn bg-[#F3E9DC] text-[#C75D2C] hover:bg-[#F8B259];
   }
   
   .btn-outline {
-    @apply btn border border-primary text-primary hover:bg-primary hover:text-white;
+    @apply btn border border-[#C75D2C] text-[#C75D2C] hover:bg-[#C75D2C] hover:text-white;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C75D2C] focus:border-[#C75D2C] transition-colors;
+  }
+  
+  .label {
+    @apply text-sm font-medium text-gray-700;
   }
   
   .card {
