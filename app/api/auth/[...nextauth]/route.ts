@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -16,9 +16,9 @@ const handler = NextAuth({
         }
 
         try {
-          // Fetch user from Supabase
-          const supabaseUrl = "https://diubdforaeqzbtbwxdfc.supabase.co";
-          const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdWJkZm9yYWVxemJ0Ynd4ZGZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3NDc4NDUsImV4cCI6MjA3MDMyMzg0NX0.W9kNfkg3HE_fjIWlCggY2qcButBKUvBCsNQ8955CY1I";
+          // Fetch user from Supabase using environment variables
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+          const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
           const response = await fetch(
             `${supabaseUrl}/rest/v1/users?email=eq.${credentials.email}&select=id,email,password_hash`,
@@ -72,13 +72,13 @@ const handler = NextAuth({
     error: "/auth/error",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: any; user: any }) {
       if (user) {
         token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (session?.user) {
         session.user.id = token.id as string;
       }
@@ -86,6 +86,8 @@ const handler = NextAuth({
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };

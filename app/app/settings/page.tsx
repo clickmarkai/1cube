@@ -6,6 +6,7 @@ import {
   Store, Users, Globe, Bell, Shield, CreditCard, Key, 
   Check, X, Plus, Settings as SettingsIcon, Save, AlertCircle 
 } from "lucide-react";
+// TODO: Change to new implementation
 import { generateChannelAuthLink } from "@/lib/channels";
 import { getChannelsByUserId, updateChannelConnectionByName as updateChannelConnectionService } from "@/lib/channels-service";
 import { type Channel } from "@/lib/channels";

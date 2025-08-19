@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Check if user already exists and create new user in Supabase
-    const supabaseUrl = "https://diubdforaeqzbtbwxdfc.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpdWJkZm9yYWVxemJ0Ynd4ZGZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3NDc4NDUsImV4cCI6MjA3MDMyMzg0NX0.W9kNfkg3HE_fjIWlCggY2qcButBKUvBCsNQ8955CY1I";
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     // First check if user already exists
     const checkResponse = await fetch(

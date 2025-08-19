@@ -1,216 +1,140 @@
-import { channelsDB } from './channels-db';
-import { type Channel, type UserChannel } from './channels';
+/**
+ * Channels Service - New Architecture
+ * Provides the interface you want while working with existing database schema
+ */
 
-interface ServiceResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  total?: number;
+import { ChannelService, ChannelType } from "./channel";
+import { TeamChannelService, TeamChannelConfig } from "./team-channel";
+
+export interface TeamInfo {
+  id: string;
+  name: string;
+  // Additional team fields can be added as needed
 }
 
-export const channelsService = {
-  async getChannelsByUserId(userId: string): Promise<ServiceResponse<Channel[]>> {
-    try {
-      if (!userId) {
-        return {
-          success: false,
-          error: 'User ID is required'
-        };
-      }
+export interface ChannelConnection {
+  channel: ChannelType;
+  config: TeamChannelConfig;
+}
 
-      const channels = channelsDB.getByUserId(userId);
-      return {
-        success: true,
-        data: channels,
-        total: channels.length
-      };
-    } catch (error) {
-      console.error('Error fetching channels:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch channels'
-      };
-    }
+export const ChannelsService = {
+  /**
+   * Get all available channel types (your Channel table equivalent)
+   */
+  async getAvailableChannels(): Promise<ChannelType[]> {
+    return ChannelService.getAllChannelTypes();
   },
 
-  async getAllChannels(): Promise<ServiceResponse<UserChannel[]>> {
-    try {
-      const channels = channelsDB.getAll();
-      return {
-        success: true,
-        data: channels,
-        total: channels.length
-      };
-    } catch (error) {
-      console.error('Error fetching channels:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch channels'
-      };
-    }
+  /**
+   * Get a specific channel type by ID
+   */
+  async getChannelType(channelId: string): Promise<ChannelType | null> {
+    return ChannelService.getChannelTypeById(channelId);
   },
 
-  async getChannelById(id: number): Promise<ServiceResponse<Channel>> {
-    try {
-      const channel = channelsDB.getById(id);
-      
+  /**
+   * Get all team-channel configurations for a team
+   * (your TeamChannel table equivalent)
+   */
+  async getTeamChannelConfigs(teamId: string): Promise<TeamChannelConfig[]> {
+    return TeamChannelService.getTeamChannels(teamId);
+  },
+
+  /**
+   * Get team channels with full channel info
+   */
+  async getTeamChannelsWithInfo(teamId: string): Promise<ChannelConnection[]> {
+    const configs = await TeamChannelService.getTeamChannels(teamId);
+    
+    const connections = [];
+    for (const config of configs) {
+      const channel = await ChannelService.getChannelTypeById(config.channel_id);
       if (!channel) {
-        return {
-          success: false,
-          error: 'Channel not found'
-        };
+        throw new Error(`Channel type ${config.channel_id} not found`);
       }
-
-      return {
-        success: true,
-        data: channel
-      };
-    } catch (error) {
-      console.error('Error fetching channel:', error);
-      return {
-        success: false,
-        error: 'Failed to fetch channel'
-      };
-    }
-  },
-
-  async updateChannelConnectionByName(
-    userId: string,
-    channelName: string, 
-    connected: boolean, 
-    lastSync?: Date
-  ): Promise<ServiceResponse<Channel>> {
-    try {
-      if (typeof connected !== 'boolean') {
-        return {
-          success: false,
-          error: 'connected field must be a boolean'
-        };
-      }
-
-      const updatedChannel = channelsDB.updateConnectionByName(userId, channelName, connected, lastSync);
-
-      if (!updatedChannel) {
-        return {
-          success: false,
-          error: 'Channel not found'
-        };
-      }
-
-      return {
-        success: true,
-        data: updatedChannel
-      };
-    } catch (error) {
-      console.error('Error updating channel connection:', error);
-      return {
-        success: false,
-        error: 'Failed to update channel connection'
-      };
-    }
-  },
-
-  async updateChannelCredentialsByName(
-    userId: string,
-    channelName: string, 
-    credentials: Channel['credentials']
-  ): Promise<ServiceResponse<Channel>> {
-    try {
-      const updatedChannel = channelsDB.updateCredentialsByName(userId, channelName, credentials);
-
-      if (!updatedChannel) {
-        return {
-          success: false,
-          error: 'Channel not found'
-        };
-      }
-
-      return {
-        success: true,
-        data: updatedChannel
-      };
-    } catch (error) {
-      console.error('Error updating channel credentials:', error);
-      return {
-        success: false,
-        error: 'Failed to update channel credentials'
-      };
-    }
-  },
-
-  async addChannelByName(
-    userId: string,
-    channelName: string,
-    credentials?: any,
-    lastSync?: Date
-  ): Promise<ServiceResponse<Channel>> {
-    try {
-      if (!channelName) {
-        return {
-          success: false,
-          error: 'channel name is required'
-        };
-      }
-
-      const result = channelsDB.addByName(userId, channelName, credentials, lastSync);
-
-      if (result.success && result.channel) {
-        return {
-          success: true,
-          data: result.channel
-        };
-      } else {
-        return {
-          success: false,
-          error: result.error || 'Failed to add channel'
-        };
-      }
-    } catch (error) {
-      console.error('Error creating channel:', error);
-      return {
-        success: false,
-        error: 'Failed to create channel'
-      };
-    }
-  },
-
-  async removeChannelByName(userId: string, channelName: string): Promise<ServiceResponse<null>> {
-    try {
-      const success = channelsDB.removeByName(userId, channelName);
       
-      if (!success) {
-        return {
-          success: false,
-          error: 'Channel not found'
-        };
-      }
-
-      return {
-        success: true,
-        data: null
-      };
-    } catch (error) {
-      console.error('Error removing channel:', error);
-      return {
-        success: false,
-        error: 'Failed to remove channel'
-      };
+      connections.push({
+        channel,
+        config
+      });
     }
+    
+    return connections;
+  },
+
+  /**
+   * Connect a team to a channel (create TeamChannel relationship)
+   */
+  async connectTeamToChannel(
+    teamId: string, 
+    channelId: string, 
+    credentials?: {
+      shop_id?: string;
+      api_key?: string;
+      api_secret?: string;
+    }
+  ): Promise<TeamChannelConfig> {
+    const config: TeamChannelConfig = {
+      team: teamId,
+      channel_id: channelId,
+      shop_id: credentials?.shop_id,
+      api_key: credentials?.api_key,
+      api_secret: credentials?.api_secret,
+      connected: true,
+      last_sync: new Date()
+    };
+
+    return TeamChannelService.setTeamChannel(config);
+  },
+
+  /**
+   * Disconnect a team from a channel
+   */
+  async disconnectTeamFromChannel(teamId: string, channelId: string): Promise<boolean> {
+    return TeamChannelService.removeTeamChannel(teamId, channelId);
+  },
+
+  /**
+   * Update team-channel credentials
+   */
+  async updateChannelCredentials(
+    teamId: string,
+    channelId: string,
+    credentials: {
+      shop_id?: string;
+      api_key?: string;
+      api_secret?: string;
+    }
+  ): Promise<TeamChannelConfig | null> {
+    return TeamChannelService.updateTeamChannelCredentials(teamId, channelId, credentials);
+  },
+
+  /**
+   * Update channel connection status
+   */
+  async updateChannelStatus(
+    teamId: string,
+    channelId: string,
+    connected: boolean
+  ): Promise<TeamChannelConfig | null> {
+    return TeamChannelService.updateTeamChannelStatus(teamId, channelId, connected);
+  },
+
+  /**
+   * Check if team is connected to a specific channel
+   */
+  async isTeamConnectedToChannel(teamId: string, channelId: string): Promise<boolean> {
+    const config = await TeamChannelService.getTeamChannel(teamId, channelId);
+    return config?.connected || false;
+  },
+
+  /**
+   * Get team channel configuration
+   */
+  async getTeamChannelConfig(teamId: string, channelId: string): Promise<TeamChannelConfig | null> {
+    return TeamChannelService.getTeamChannel(teamId, channelId);
   }
 };
 
-export const {
-  getChannelsByUserId,
-  getAllChannels,
-  getChannelById,
-  updateChannelConnectionByName,
-  updateChannelCredentialsByName,
-  addChannelByName,
-  removeChannelByName
-} = channelsService;
-
-// Backward compatibility aliases
-export const updateChannelConnection = channelsService.updateChannelConnectionByName;
-export const updateChannelCredentials = channelsService.updateChannelCredentialsByName;
-export const addChannel = channelsService.addChannelByName;
-export const removeChannel = channelsService.removeChannelByName;
+// Export types for use in other parts of the application
+export type { ChannelType, TeamChannelConfig };
