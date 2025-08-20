@@ -1,27 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { 
   Store, Users, Globe, Bell, Shield, CreditCard, Key, 
   Check, X, Plus, Settings as SettingsIcon, Save, AlertCircle 
 } from "lucide-react";
-// TODO: Change to new implementation
 import { generateChannelAuthLink } from "@/lib/channels";
 import { getChannelsByUserId, updateChannelConnectionByName as updateChannelConnectionService } from "@/lib/channels-service";
 import { type Channel } from "@/lib/channels";
-
-// Mock session hook - replace with real NextAuth session later
-function useCurrentUser() {
-  // This would be replaced with: const { data: session } = useSession();
-  return {
-    user: {
-      id: "1", // Demo user ID - matches our database
-      name: "Demo User",
-      email: "demo@1cube.id"
-    }
-  };
-}
 
 type TabType = "channels" | "team" | "brand" | "billing" | "security";
 
@@ -34,12 +22,12 @@ interface TeamMember {
   joinedAt: Date;
 }
 
-export default function SettingsPage() {
+function SettingsContent() {
   const [activeTab, setActiveTab] = useState<TabType>("channels");
   const [hasChanges, setHasChanges] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const searchParams = useSearchParams();
-  const { user } = useCurrentUser();
+  const { data: session, status } = useSession();
 
   // Channel Management State
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -47,7 +35,13 @@ export default function SettingsPage() {
 
   // Team Management State
   const [teamMembers] = useState<TeamMember[]>([
-    { id: "1", name: "Demo User", email: "demo@1cube.id", role: "owner", joinedAt: new Date('2025-01-17T00:00:00Z') },
+    { 
+      id: session?.user?.id || "1", 
+      name: session?.user?.name || "Current User", 
+      email: session?.user?.email || "user@1cube.id", 
+      role: "owner", 
+      joinedAt: new Date('2025-01-17T00:00:00Z') 
+    },
     { id: "2", name: "Sarah Marketing", email: "sarah@company.id", role: "admin", joinedAt: new Date('2024-12-18T00:00:00Z') },
     { id: "3", name: "Budi Content", email: "budi@company.id", role: "editor", joinedAt: new Date('2025-01-02T00:00:00Z') },
   ]);
@@ -73,14 +67,14 @@ export default function SettingsPage() {
 
   const fetchChannels = async () => {
     try {
-      if (!user?.id) {
+      if (!session?.user?.id) {
         setMessage({ type: 'error', text: 'User not authenticated' });
         setIsLoadingChannels(false);
         return;
       }
 
       setIsLoadingChannels(true);
-      const result = await getChannelsByUserId(user.id);
+      const result = await getChannelsByUserId(session.user.id);
       
       if (result.success && result.data) {
         setChannels(result.data);
@@ -98,13 +92,13 @@ export default function SettingsPage() {
 
   const updateChannelConnection = async (channelName: string, connected: boolean) => {
     try {
-      if (!user?.id) {
+      if (!session?.user?.id) {
         setMessage({ type: 'error', text: 'User not authenticated' });
         return false;
       }
 
       const result = await updateChannelConnectionService(
-        user.id,
+        session.user.id,
         channelName, 
         connected, 
         connected ? new Date() : undefined
@@ -128,10 +122,10 @@ export default function SettingsPage() {
   };
   
   useEffect(() => {
-    if (user?.id) {
+    if (session?.user?.id && status === "authenticated") {
       fetchChannels();
     }
-  }, [user?.id]);
+  }, [session?.user?.id, status]);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -214,9 +208,9 @@ export default function SettingsPage() {
                 <button 
                   className="btn-primary px-4 py-2"
                   onClick={async () => {  
-                    if (channel.name === "shopee") {
+                    if (channel.name === "Shopee") {
                       const { authLink, state } = generateChannelAuthLink('shopee', {
-                        userId: user.id
+                        userId: session?.user?.id || ""
                       });
                       
                       document.cookie = `shopee_auth_state=${state}; path=/; max-age=600; secure; samesite=strict`;
@@ -592,6 +586,37 @@ export default function SettingsPage() {
     }
   };
 
+  // Show loading state while session is loading
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect unauthenticated users
+  if (status === "unauthenticated") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Authentication Required</h1>
+          <p className="text-gray-600 mb-4">You need to be logged in to access settings.</p>
+          <button 
+            onClick={() => window.location.href = '/auth/login'}
+            className="btn-primary px-4 py-2"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -650,5 +675,20 @@ export default function SettingsPage() {
       {/* Content */}
       <div>{renderContent()}</div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <SettingsContent />
+    </Suspense>
   );
 }

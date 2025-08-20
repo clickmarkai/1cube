@@ -5,6 +5,8 @@
 
 import { ChannelService, ChannelType } from "./channel";
 import { TeamChannelService, TeamChannelConfig } from "./team-channel";
+import { TeamUserService } from "./team-user";
+import { ChannelInfo } from "./channels";
 
 export interface TeamInfo {
   id: string;
@@ -135,6 +137,137 @@ export const ChannelsService = {
     return TeamChannelService.getTeamChannel(teamId, channelId);
   }
 };
+
+// Legacy compatibility functions for settings page
+const DEFAULT_TEAM_ID = "4aaa07c6-8291-441d-bcf6-1b6621bb27d1";
+
+/**
+ * Get channels for a user (compatibility function)
+ * Converts from user-based API to team-based implementation
+ */
+export async function getChannelsByUserId(userId: string): Promise<{
+  success: boolean;
+  data?: ChannelInfo[];
+  error?: string;
+}> {
+  try {
+    // Get team ID for user
+    let teamId: string;
+    try {
+      const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
+      teamId = userTeamId || DEFAULT_TEAM_ID;
+    } catch (error) {
+      console.warn(`Could not get team for user ${userId}, using default team`);
+      teamId = DEFAULT_TEAM_ID;
+    }
+
+    // Get all available channel types
+    const availableChannels = await ChannelsService.getAvailableChannels();
+    
+    // Get team's channel configurations
+    const teamChannels = await ChannelsService.getTeamChannelConfigs(teamId);
+    
+    // Create map for quick lookup
+    const teamChannelMap = new Map<string, TeamChannelConfig>();
+    teamChannels.forEach(tc => teamChannelMap.set(tc.channel_id, tc));
+
+    // Combine available channels with team configurations
+    const channels: ChannelInfo[] = availableChannels.map(channel => {
+      const teamConfig = teamChannelMap.get(channel.id);
+      
+      // Default icon mapping
+      const iconMap: Record<string, string> = {
+        'shopee': '🛒',
+        'tokopedia': '🏪',
+        'bukalapak': '🛍️',
+        'tiktok': '🎵'
+      };
+
+      return {
+        id: channel.id,
+        name: channel.name,
+        icon: iconMap[channel.name.toLowerCase()] || '🏬',
+        connected: teamConfig?.connected || false,
+        lastSync: teamConfig?.last_sync
+      };
+    });
+
+    return {
+      success: true,
+      data: channels
+    };
+  } catch (error) {
+    console.error('getChannelsByUserId error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
+ * Update channel connection by name (compatibility function)
+ * Converts from user-based API to team-based implementation
+ */
+export async function updateChannelConnectionByName(
+  userId: string,
+  channelName: string,
+  connected: boolean,
+  lastSync?: Date
+): Promise<{
+  success: boolean;
+  data?: TeamChannelConfig;
+  error?: string;
+}> {
+  try {
+    // Get team ID for user
+    let teamId: string;
+    try {
+      const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
+      teamId = userTeamId || DEFAULT_TEAM_ID;
+    } catch (error) {
+      console.warn(`Could not get team for user ${userId}, using default team`);
+      teamId = DEFAULT_TEAM_ID;
+    }
+
+    // Get channel by name
+    const channel = await ChannelService.getChannelTypeByName(channelName);
+    if (!channel) {
+      return {
+        success: false,
+        error: `Channel '${channelName}' not found`
+      };
+    }
+
+    let result: TeamChannelConfig | null;
+
+    if (connected) {
+      // Connect team to channel
+      result = await ChannelsService.connectTeamToChannel(teamId, channel.id);
+    } else {
+      // Update status to disconnected
+      result = await ChannelsService.updateChannelStatus(teamId, channel.id, false);
+    }
+
+    if (!result) {
+      return {
+        success: false,
+        error: 'Failed to update channel connection'
+      };
+    }
+
+    return {
+      success: true,
+      data: result
+    };
+  } catch (error) {
+    console.error('updateChannelConnectionByName error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
 
 // Export types for use in other parts of the application
 export type { ChannelType, TeamChannelConfig };

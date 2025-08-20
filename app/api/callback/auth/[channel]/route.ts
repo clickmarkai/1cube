@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { ChannelFactory } from "@/lib/channels";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     channel: string;
-  };
+  }>;
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
-  const { channel } = params;
+  const { channel } = await params;
   
   try {
     // Factory handles validation internally - no need to verify channel

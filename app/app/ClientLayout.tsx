@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { InstantNav } from "../../components/ui/InstantNavigation";
 import { usePrefetchRoutes } from "../../hooks/usePrefetchRoutes";
 import { PerformanceMonitor } from "../../components/PerformanceMonitor";
@@ -45,34 +46,52 @@ const navigation = [
   { name: "Settings", href: "/app/settings", icon: Settings },
 ];
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
+function ClientLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { data: session, status } = useSession();
   
   console.log('🏗️ ClientLayout rendering for pathname:', pathname);
+  console.log('🔐 Session status:', status, 'Session:', session);
   
   // Prefetch all routes for instant navigation
   usePrefetchRoutes();
 
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; company?: string } | null>(null);
-
-  // Guard: redirect to login if no session in localStorage
+  // Guard: redirect to login if no session (with delay to avoid loops)
   useEffect(() => {
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("session") : null;
-      if (!raw) {
+    if (status === "unauthenticated") {
+      // Small delay to prevent immediate redirect loops
+      const timer = setTimeout(() => {
         router.replace("/auth/login");
-        return;
-      }
-      const session = JSON.parse(raw);
-      setCurrentUser({ name: session.email?.split("@")[0] || "User", email: session.email });
-    } catch {
-      router.replace("/auth/login");
+      }, 100);
+      return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [status, router]);
+
+  // Show loading while session is being checked
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -130,8 +149,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <User className="h-5 w-5 text-primary" />
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-900">{currentUser?.name ?? "User"}</p>
-              <p className="text-xs text-gray-500">{currentUser?.company ?? ""}</p>
+              <p className="text-sm font-medium text-gray-900">{session?.user?.name ?? "User"}</p>
+              <p className="text-xs text-gray-500">{session?.user?.email ?? ""}</p>
             </div>
           </div>
         </div>
@@ -151,7 +170,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
             <div className="flex-1 px-4">
               <p className="text-sm text-gray-500">
-                Welcome back, {currentUser?.name ?? "User"}
+                Welcome back, {session?.user?.name ?? "User"}
               </p>
             </div>
 
@@ -185,8 +204,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                       </InstantNav>
                       <button
                         onClick={() => {
-                          try { localStorage.removeItem("session"); } catch {}
-                          window.location.href = "/auth/login";
+                          // Use NextAuth signOut
+                          signOut({ callbackUrl: "/auth/login" });
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
@@ -206,4 +225,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       </div>
     </div>
   );
+}
+
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  return <ClientLayoutContent>{children}</ClientLayoutContent>;
 }
