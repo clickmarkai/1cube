@@ -20,7 +20,7 @@ const kpiData = [
 ];
 
 const channelData = [
-  { name: "Shopee", revenue: "Rp 996M", percentage: 35, color: "bg-orange-500" },
+  { name: "shopee", revenue: "Rp 996M", percentage: 35, color: "bg-orange-500" },
   { name: "Tokopedia", revenue: "Rp 797M", percentage: 28, color: "bg-green-500" },
   { name: "TikTok Shop", revenue: "Rp 569M", percentage: 20, color: "bg-black" },
   { name: "Lazada", revenue: "Rp 284M", percentage: 10, color: "bg-blue-500" },
@@ -186,7 +186,7 @@ export default function AnalyticsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {[
-                { channel: "Shopee", revenue: "Rp 996M", orders: "2,213", aov: "Rp 450K", roas: "4.8x", growth: "+12%" },
+                { channel: "shopee", revenue: "Rp 996M", orders: "2,213", aov: "Rp 450K", roas: "4.8x", growth: "+12%" },
                 { channel: "Tokopedia", revenue: "Rp 797M", orders: "1,772", aov: "Rp 450K", roas: "4.2x", growth: "+8%" },
                 { channel: "TikTok Shop", revenue: "Rp 569M", orders: "1,265", aov: "Rp 450K", roas: "3.9x", growth: "+25%" },
                 { channel: "Lazada", revenue: "Rp 284M", orders: "632", aov: "Rp 450K", roas: "3.5x", growth: "+5%" },

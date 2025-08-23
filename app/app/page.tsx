@@ -30,7 +30,7 @@ const revenueData = [
 ];
 
 const channelData = [
-  { name: "Shopee", value: 35, revenue: 996625000, color: "#FF6B35" },
+  { name: "shopee", value: 35, revenue: 996625000, color: "#FF6B35" },
   { name: "Tokopedia", value: 28, revenue: 797300000, color: "#42B549" },
   { name: "TikTok Shop", value: 20, revenue: 569500000, color: "#000000" },
   { name: "Lazada", value: 10, revenue: 284750000, color: "#0F146D" },

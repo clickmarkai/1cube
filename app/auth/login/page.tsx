@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -40,11 +41,8 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Invalid email or password");
       } else if (result?.ok) {
-        // Persist minimal session in localStorage for client routing
-        localStorage.setItem(
-          "session",
-          JSON.stringify({ email: formData.email, loggedInAt: Date.now() })
-        );
+        // Success! NextAuth will handle the session
+        // The useEffect above will redirect when session becomes "authenticated"
         router.push("/app");
       }
     } catch (error) {
@@ -54,16 +52,29 @@ export default function LoginPage() {
     }
   };
 
-  // If a session exists already, avoid showing login
+  // If already authenticated, redirect to app
   useEffect(() => {
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("session") : null;
-      if (raw) {
-        router.replace("/app");
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (status === "authenticated") {
+      router.replace("/app");
+    }
+  }, [status, router]);
+
+  // Show loading while session is being checked
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-lighter via-white to-primary-light flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If authenticated, don't show login form (redirect will happen in useEffect)
+  if (status === "authenticated") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-lighter via-white to-primary-light flex items-center justify-center px-4">
@@ -162,5 +173,20 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-primary-lighter via-white to-primary-light flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
