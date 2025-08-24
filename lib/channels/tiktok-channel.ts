@@ -27,9 +27,9 @@ export class TikTokChannel extends BaseChannel {
     const config: ChannelConfig = {
       name: 'TikTok',
       description: 'Global platform for short-form video content and shopping',
-      requiredFields: ['code']
+      requiredFields: []
     };
-    
+
     super('tiktok', config);
   }
 
@@ -75,30 +75,29 @@ export class TikTokChannel extends BaseChannel {
   async generateAuthLink(params: AuthLinkParams): Promise<AuthLinkResult> {
     const state = this.generateState(params.userId);
     const redirectUri = this.getRedirectUri(params.redirectUri);
-    
-    // Store state in session for verification during callback
-    await this.storeSessionState(state, params.userId, 'tiktok');
-    
+
+    console.log(`🔗 TikTok generateAuthLink - State: ${state}, UserId: ${params.userId}`);
+
+    // Generate PKCE parameters first
+    const { codeChallenge, codeVerifier } = this.generatePKCEParams();
+
+    // Store state with code verifier in one operation for better reliability
+    await this.storeSessionStateWithVerifier(state, params.userId, 'tiktok', codeVerifier);
+
     // Default scopes for TikTok API access
     const defaultScopes = [
       'user.info.basic',
-      'user.info.profile', 
+      'user.info.profile',
       'user.info.stats',
       'video.list',
       'video.upload'
     ];
-    
+
     const scopes = params.scopes && params.scopes.length > 0 ? params.scopes : defaultScopes;
     const scopeString = scopes.join(',');
 
-    // Generate PKCE parameters
-    const { codeChallenge, codeVerifier } = this.generatePKCEParams();
-    
-    // Store code verifier for later use during token exchange
-    await this.storeCodeVerifier(state, codeVerifier);
-    
     // TikTok OAuth authorization URL
-    const authLink = 
+    const authLink =
       'https://www.tiktok.com/v2/auth/authorize/?' +
       `client_key=${this.CLIENT_KEY}&` +
       'response_type=code&' +
@@ -109,6 +108,13 @@ export class TikTokChannel extends BaseChannel {
       `code_challenge=${codeChallenge}&` +
       `code_challenge_method=S256`;
 
+    // Verify the state was stored correctly in database
+    const verification = await this.verifySessionState(state);
+    if (!verification.valid) {
+      throw new Error(`❌ Failed to store session state in database - OAuth link generation failed: ${verification.error}`);
+    }
+
+    console.log('✅ TikTok auth link generated successfully with stored state');
     return { authLink, state };
   }
 
@@ -122,7 +128,7 @@ export class TikTokChannel extends BaseChannel {
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=+$/, "");
-    
+
     const codeChallenge = base64url(
       crypto.createHash("sha256").update(codeVerifier).digest()
     );
@@ -130,12 +136,49 @@ export class TikTokChannel extends BaseChannel {
     return { codeChallenge, codeVerifier };
   }
 
+  // Debug method to test session state storage
+  public async testSessionStateStorage(userId: string): Promise<{ success: boolean; details: string }> {
+    try {
+      const testState = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const testVerifier = 'test_verifier_' + Date.now();
+
+      console.log('🧪 Testing session state storage...');
+
+      // Test storage
+      await this.storeSessionStateWithVerifier(testState, userId, 'tiktok', testVerifier);
+
+      // Test retrieval
+      const retrieved = global.oauthStates?.get(testState);
+      if (!retrieved) {
+        return { success: false, details: 'Failed to retrieve stored state' };
+      }
+
+      // Test code verifier retrieval
+      const retrievedVerifier = await this.getCodeVerifier(testState);
+      if (retrievedVerifier !== testVerifier) {
+        return { success: false, details: 'Code verifier mismatch' };
+      }
+
+      // Test verification
+      const verification = await this.verifySessionState(testState);
+      if (!verification.valid) {
+        return { success: false, details: 'State verification failed: ' + verification.error };
+      }
+
+      console.log('✅ Session state storage test passed');
+      return { success: true, details: 'All tests passed' };
+    } catch (error) {
+      console.error('❌ Session state storage test failed:', error);
+      return { success: false, details: 'Exception: ' + (error as Error).message };
+    }
+  }
+
   private async storeCodeVerifier(state: string, codeVerifier: string): Promise<void> {
     try {
       if (!global.oauthStates) {
         global.oauthStates = new Map();
       }
-      
+
       // Get existing state data or create new
       const existingState = global.oauthStates.get(state);
       if (existingState) {
@@ -145,7 +188,7 @@ export class TikTokChannel extends BaseChannel {
       } else {
         console.warn(`State ${state} not found when trying to store code verifier`);
       }
-      
+
       console.log(`Stored PKCE code verifier for state ${state}`);
     } catch (error) {
       console.error('Error storing code verifier:', error);
@@ -154,18 +197,23 @@ export class TikTokChannel extends BaseChannel {
 
   private async getCodeVerifier(state: string): Promise<string | null> {
     try {
+      console.log(`🔑 Retrieving code verifier for state: ${state}`);
+
       if (!global.oauthStates) {
+        console.log('❌ No global OAuth states found');
         return null;
       }
-      
+
       const stateData = global.oauthStates.get(state);
       if (stateData && stateData.codeVerifier) {
+        console.log('✅ Code verifier found');
         return stateData.codeVerifier;
       }
-      
+
+      console.log('❌ Code verifier not found for state');
       return null;
     } catch (error) {
-      console.error('Error retrieving code verifier:', error);
+      console.error('❌ Error retrieving code verifier:', error);
       return null;
     }
   }
@@ -213,7 +261,43 @@ export class TikTokChannel extends BaseChannel {
     return [];
   }
 
-  // Session state management for OAuth security
+  // Database-based session state and code verifier storage
+  private async storeSessionStateWithVerifier(state: string, userId: string, channelName: string, codeVerifier: string): Promise<void> {
+    try {
+      console.log(`📦 Storing TikTok session state in DB - State: ${state}, UserId: ${userId}, Channel: ${channelName}`);
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_state`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          state,
+          user_id: userId,
+          channel_name: channelName,
+          code_verifier: codeVerifier
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Database storage failed: ${response.status} ${error}`);
+      }
+
+      console.log(`✅ Stored OAuth state for ${channelName} channel, user ${userId} in database`);
+    } catch (error) {
+      console.error('❌ Error storing session state in database:', error);
+      throw error; // Re-throw to prevent auth link generation if storage fails
+    }
+  }
+
+  // Session state management for OAuth security (legacy method, keeping for compatibility)
   private async storeSessionState(state: string, userId: string, channelName: string): Promise<void> {
     try {
       // Store state in a temporary in-memory store with timestamp
@@ -229,12 +313,12 @@ export class TikTokChannel extends BaseChannel {
       if (!global.oauthStates) {
         global.oauthStates = new Map();
       }
-      
+
       global.oauthStates.set(state, stateData);
-      
-      // Clean up old states (older than 10 minutes)
-      this.cleanupOldStates();
-      
+
+      // Clean up expired states in database
+      await this.cleanupExpiredStates();
+
       console.log(`Stored OAuth state for ${channelName} channel, user ${userId}`);
     } catch (error) {
       console.error('Error storing session state:', error);
@@ -243,48 +327,96 @@ export class TikTokChannel extends BaseChannel {
 
   private async verifySessionState(state: string): Promise<{ valid: boolean; error?: string; userId?: string }> {
     try {
-      if (!global.oauthStates) {
-        return { valid: false, error: 'OAuth state storage not initialized' };
+      console.log(`🔍 Verifying TikTok session state from database: ${state}`);
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      // Fetch state from database
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/user_state?state=eq.${state}&select=user_id,channel_name,expires_at,code_verifier`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('❌ Database query failed:', response.status);
+        return { valid: false, error: 'Database verification failed' };
       }
 
-      const storedState = global.oauthStates.get(state);
-      
-      if (!storedState) {
+      const states = await response.json();
+
+      if (states.length === 0) {
+        console.log('❌ OAuth state not found in database');
         return { valid: false, error: 'OAuth state not found - session may have expired' };
       }
 
-      // Check if state has expired (10 minutes)
-      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-      if (storedState.timestamp < tenMinutesAgo) {
-        global.oauthStates.delete(state);
+      const storedState = states[0];
+
+      // Check if state has expired
+      if (new Date(storedState.expires_at) < new Date()) {
+        console.log('❌ OAuth state expired');
+        // Clean up expired state
+        await this.deleteExpiredState(state);
         return { valid: false, error: 'OAuth state expired - please try again' };
       }
 
       // Verify channel matches
-      if (storedState.channelName !== 'tiktok') {
+      if (storedState.channel_name !== 'tiktok') {
+        console.log('❌ OAuth state channel mismatch');
         return { valid: false, error: 'OAuth state channel mismatch' };
       }
 
-      // State is valid - remove it to prevent reuse
-      global.oauthStates.delete(state);
-      
-      console.log(`Verified OAuth state for tiktok channel, user ${storedState.userId}`);
-      return { valid: true, userId: storedState.userId };
+      console.log(`✅ Verified OAuth state for tiktok channel, user ${storedState.user_id}`);
+
+      return { valid: true, userId: storedState.user_id };
     } catch (error) {
-      console.error('Error verifying session state:', error);
+      console.error('❌ Error verifying session state:', error);
       return { valid: false, error: 'Error verifying OAuth state' };
     }
   }
 
-  private cleanupOldStates(): void {
-    if (!global.oauthStates) return;
-    
-    const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-    
-    for (const [state, data] of global.oauthStates.entries()) {
-      if (data.timestamp < tenMinutesAgo) {
-        global.oauthStates.delete(state);
-      }
+  private async deleteExpiredState(state: string): Promise<void> {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      await fetch(`${supabaseUrl}/rest/v1/user_state?state=eq.${state}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log(`🗑️ Deleted expired state from database: ${state}`);
+    } catch (error) {
+      console.error('❌ Error deleting expired state:', error);
+    }
+  }
+
+  // Clean up expired states periodically
+  private async cleanupExpiredStates(): Promise<void> {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      await fetch(`${supabaseUrl}/rest/v1/user_state?expires_at=lt.${new Date().toISOString()}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log(`🧹 Cleaned up expired OAuth states from database`);
+    } catch (error) {
+      console.error('❌ Error cleaning up expired states:', error);
     }
   }
 }

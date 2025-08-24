@@ -108,78 +108,140 @@ export class ShopeeChannel extends BaseChannel {
     return [];
   }
 
-  // Session state management for OAuth security
+  // Database-based session state storage  
   private async storeSessionState(state: string, userId: string, channelName: string): Promise<void> {
     try {
-      // Store state in a temporary in-memory store with timestamp
-      // In production, you might want to use Redis or database
-      const stateData = {
-        state,
-        userId,
-        channelName,
-        timestamp: Date.now()
-      };
+      console.log(`📦 Storing Shopee session state in DB - State: ${state}, UserId: ${userId}, Channel: ${channelName}`);
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-      // Use a simple in-memory storage for now (should be replaced with persistent storage)
-      if (!global.oauthStates) {
-        global.oauthStates = new Map();
+      const response = await fetch(`${supabaseUrl}/rest/v1/user_state`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          state,
+          user_id: userId,
+          channel_name: channelName,
+          code_verifier: null // Shopee doesn't use PKCE
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Database storage failed: ${response.status} ${error}`);
       }
       
-      global.oauthStates.set(state, stateData);
+      // Clean up expired states in database
+      await this.cleanupExpiredStates();
       
-      // Clean up old states (older than 10 minutes)
-      this.cleanupOldStates();
-      
-      console.log(`Stored OAuth state for ${channelName} channel, user ${userId}`);
+      console.log(`✅ Stored OAuth state for ${channelName} channel, user ${userId} in database`);
     } catch (error) {
-      console.error('Error storing session state:', error);
+      console.error('❌ Error storing session state in database:', error);
+      throw error; // Re-throw to prevent auth link generation if storage fails
     }
   }
 
   private async verifySessionState(state: string): Promise<{ valid: boolean; error?: string; userId?: string }> {
     try {
-      if (!global.oauthStates) {
-        return { valid: false, error: 'OAuth state storage not initialized' };
+      console.log(`🔍 Verifying Shopee session state from database: ${state}`);
+      
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      // Fetch state from database
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/user_state?state=eq.${state}&select=user_id,channel_name,expires_at`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('❌ Database query failed:', response.status);
+        return { valid: false, error: 'Database verification failed' };
       }
 
-      const storedState = global.oauthStates.get(state);
+      const states = await response.json();
       
-      if (!storedState) {
+      if (states.length === 0) {
+        console.log('❌ OAuth state not found in database');
         return { valid: false, error: 'OAuth state not found - session may have expired' };
       }
 
-      // Check if state has expired (10 minutes)
-      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-      if (storedState.timestamp < tenMinutesAgo) {
-        global.oauthStates.delete(state);
+      const storedState = states[0];
+
+      // Check if state has expired
+      if (new Date(storedState.expires_at) < new Date()) {
+        console.log('❌ OAuth state expired');
+        // Clean up expired state
+        await this.deleteExpiredState(state);
         return { valid: false, error: 'OAuth state expired - please try again' };
       }
 
       // Verify channel matches
-      if (storedState.channelName !== 'shopee') {
+      if (storedState.channel_name !== 'shopee') {
+        console.log('❌ OAuth state channel mismatch');
         return { valid: false, error: 'OAuth state channel mismatch' };
       }
 
-      // State is valid - remove it to prevent reuse
-      global.oauthStates.delete(state);
+      console.log(`✅ Verified OAuth state for shopee channel, user ${storedState.user_id}`);
       
-      console.log(`Verified OAuth state for shopee channel, user ${storedState.userId}`);
-      return { valid: true, userId: storedState.userId };
+      // State is valid - remove it to prevent reuse
+      await this.deleteExpiredState(state);
+      
+      return { valid: true, userId: storedState.user_id };
     } catch (error) {
-      console.error('Error verifying session state:', error);
+      console.error('❌ Error verifying session state:', error);
       return { valid: false, error: 'Error verifying OAuth state' };
     }
   }
 
-  private cleanupOldStates(): void {
-    if (!global.oauthStates) return;
-    
-    const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-    
-    for (const [state, data] of global.oauthStates.entries()) {
-      if (data.timestamp < tenMinutesAgo) {
-        global.oauthStates.delete(state);
-      }
+  private async deleteExpiredState(state: string): Promise<void> {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      await fetch(`${supabaseUrl}/rest/v1/user_state?state=eq.${state}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log(`🗑️ Deleted expired state from database: ${state}`);
+    } catch (error) {
+      console.error('❌ Error deleting expired state:', error);
+    }
+  }
+
+  // Clean up expired states periodically
+  private async cleanupExpiredStates(): Promise<void> {
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      await fetch(`${supabaseUrl}/rest/v1/user_state?expires_at=lt.${new Date().toISOString()}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log(`🧹 Cleaned up expired OAuth states from database`);
+    } catch (error) {
+      console.error('❌ Error cleaning up expired states:', error);
     }
   }
 }

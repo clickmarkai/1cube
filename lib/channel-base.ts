@@ -63,7 +63,7 @@ export abstract class BaseChannel {
     try {
       // Extract parameters from URL
       const params = this.extractParams(request);
-      
+      console.log("Debug Param Edgar: " + JSON.stringify(params));
       // Check for OAuth errors
       if (params.error) {
         return this.createErrorRedirect(request, `OAuth error: ${params.error_description || params.error}`);
@@ -202,9 +202,10 @@ export abstract class BaseChannel {
     if (customRedirectUri) {
       return customRedirectUri;
     }
-    // return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
-    return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
-
+    return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
+    
+    // For Faster Debugging, use this instead of the above
+    // return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
     // return `${process.env.BASE_URL || 'http://localhost:3000'}/api/callback/auth/${this.channelName.toLowerCase()}`;
   }
 }
