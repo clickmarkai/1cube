@@ -48,10 +48,10 @@ export abstract class BaseChannel {
 
   // Abstract methods - must be implemented by concrete classes
   abstract extractCredentials(params: Record<string, string>): ChannelCredentials;
-  abstract validateSpecificParams(params: Record<string, string>): { valid: boolean; error?: string };
+  abstract validateSpecificParams(params: Record<string, string>): Promise<{ valid: boolean; error?: string }>;
   
   // Auth methods
-  abstract generateAuthLink(params: AuthLinkParams): AuthLinkResult;
+  abstract generateAuthLink(params: AuthLinkParams): Promise<AuthLinkResult>;
   
   // Additional abstract methods for channel operations
   abstract sync(): Promise<void>;
@@ -83,7 +83,7 @@ export abstract class BaseChannel {
       const userId = session.user.id;
 
       // Channel-specific validation
-      const validation = this.validateSpecificParams(params);
+      const validation = await this.validateSpecificParams(params);
       if (!validation.valid) {
         return this.createErrorRedirect(request, validation.error || 'Validation failed');
       }
@@ -202,7 +202,8 @@ export abstract class BaseChannel {
     if (customRedirectUri) {
       return customRedirectUri;
     }
-    return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}`;
+    // return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
+    return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
 
     // return `${process.env.BASE_URL || 'http://localhost:3000'}/api/callback/auth/${this.channelName.toLowerCase()}`;
   }

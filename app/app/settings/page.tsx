@@ -137,7 +137,7 @@ function SettingsContent() {
       setMessage({ type: 'error', text: errorMessage });
     } else if (success && successMessage) {
       setMessage({ type: 'success', text: successMessage });
-      if (success === 'Shopee_connected') {
+      if (success === 'shopee_connected' || success === 'tiktok_connected') {
         fetchChannels();
       }
     }
@@ -209,13 +209,29 @@ function SettingsContent() {
                   className="btn-primary px-4 py-2"
                   onClick={async () => {  
                     if (channel.name === "Shopee") {
-                      const { authLink, state } = generateChannelAuthLink('shopee', {
-                        userId: session?.user?.id || ""
-                      });
-                      
-                      document.cookie = `shopee_auth_state=${state}; path=/; max-age=600; secure; samesite=strict`;
-                      
-                      window.location.href = authLink;
+                      try {
+                        const { authLink, state } = await generateChannelAuthLink('shopee', {
+                          userId: session?.user?.id || ""
+                        });
+                        
+                        // State is now stored server-side, no need for cookie
+                        window.location.href = authLink;
+                      } catch (error) {
+                        console.error('Error generating Shopee auth link:', error);
+                        setMessage({ type: 'error', text: 'Failed to initiate Shopee authentication' });
+                      }
+                    } else if (channel.name === "TikTok") {
+                      try {
+                        const { authLink, state } = await generateChannelAuthLink('tiktok', {
+                          userId: session?.user?.id || ""
+                        });
+                        
+                        // State is now stored server-side, no need for cookie
+                        window.location.href = authLink;
+                      } catch (error) {
+                        console.error('Error generating TikTok auth link:', error);
+                        setMessage({ type: 'error', text: 'Failed to initiate TikTok authentication' });
+                      }
                     } else {
                       await updateChannelConnection(channel.name, true);
                     }
