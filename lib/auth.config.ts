@@ -3,6 +3,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -73,17 +77,25 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
+      console.log('🔑 JWT Callback - User:', user, 'Token:', token);
       if (user) {
         token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session?.user) {
+      console.log('👤 Session Callback - Session:', session, 'Token:', token);
+      if (session?.user && token) {
         session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
       }
+      console.log('👤 Final Session:', session);
       return session;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: true, // Enable debug mode to see what's happening
 };

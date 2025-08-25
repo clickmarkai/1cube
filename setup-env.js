@@ -24,6 +24,12 @@ BASE_URL=http://localhost:3000
 SHOPEE_PARTNER_ID=1181853
 SHOPEE_PARTNER_KEY=shpk4862574b726c77774655794f5241555a534d447876475678795048577a61
 
+# TikTok API Configuration (Optional - for production)
+TIKTOK_HOST=https://business-api.tiktok.com
+TIKTOK_APP_ID=your-tiktok-app-id
+TIKTOK_APP_SECRET=your-tiktok-app-secret
+TIKTOK_CLIENT_KEY=sbawbjuuq7qev3vci3
+
 # Database URL (if using Prisma - currently using Supabase)
 # DATABASE_URL="file:./dev.db"
 `;

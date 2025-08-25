@@ -5,12 +5,13 @@
 
 import { BaseChannel, type AuthLinkParams, type AuthLinkResult } from "./channel-base";
 import { ShopeeChannel } from "./channels/shopee-channel";
+import { TikTokChannel } from "./channels/tiktok-channel";
 
 export enum ChannelType {
-  SHOPEE = 'shopee'
+  SHOPEE = 'shopee',
+  TIKTOK = 'tiktok'
   // Add more channels here as needed
-  // TOKOPEDIA = 'tokopedia',
-  // TIKTOK = 'tiktok'
+  // TOKOPEDIA = 'tokopedia'
 }
 
 export class ChannelFactory {
@@ -19,7 +20,7 @@ export class ChannelFactory {
   static getChannel(channel: ChannelType | string): BaseChannel {
     // Handle both enum and string inputs
     let channelEnum: ChannelType;
-    
+
     if (typeof channel === 'string') {
       if (!this.isValidChannel(channel)) {
         throw new Error(`Unsupported channel: ${channel}`);
@@ -34,7 +35,7 @@ export class ChannelFactory {
       const instance = this.createChannelInstance(channelEnum);
       this.instances.set(channelEnum, instance);
     }
-    
+
     return this.instances.get(channelEnum)!;
   }
 
@@ -42,11 +43,13 @@ export class ChannelFactory {
     switch (channel) {
       case ChannelType.SHOPEE:
         return new ShopeeChannel();
-      
+      case ChannelType.TIKTOK:
+        return new TikTokChannel();
+
       // Add more channels here
       // case ChannelType.TOKOPEDIA:
       //   return new TokopediaChannel();
-      
+
       default:
         throw new Error(`Unsupported channel: ${channel}`);
     }
@@ -61,7 +64,7 @@ export class ChannelFactory {
   }
 
   static getChannelNames(): string[] {
-    return this.getAllChannels().map(channel => 
+    return this.getAllChannels().map(channel =>
       this.getChannel(channel).getName()
     );
   }
@@ -87,10 +90,10 @@ export interface ChannelInfo {
 export type Channel = ChannelInfo;
 
 // Legacy compatibility function for settings page
-export function generateChannelAuthLink(
-  channelName: string, 
+export async function generateChannelAuthLink(
+  channelName: string,
   params: AuthLinkParams
-): AuthLinkResult {
+): Promise<AuthLinkResult> {
   const channel = ChannelFactory.getChannel(channelName);
-  return channel.generateAuthLink(params);
+  return await channel.generateAuthLink(params);
 }
