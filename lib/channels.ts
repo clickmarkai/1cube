@@ -6,10 +6,12 @@
 import { BaseChannel, type AuthLinkParams, type AuthLinkResult } from "./channel-base";
 import { ShopeeChannel } from "./channels/shopee-channel";
 import { TikTokChannel } from "./channels/tiktok-channel";
+import { TikTokShopChannel } from "./channels/tiktok-shop-channel";
 
 export enum ChannelType {
   SHOPEE = 'shopee',
-  TIKTOK = 'tiktok'
+  TIKTOK = 'tiktok',
+  TIKTOK_SHOP = 'tiktok shop'
   // Add more channels here as needed
   // TOKOPEDIA = 'tokopedia'
 }
@@ -45,7 +47,8 @@ export class ChannelFactory {
         return new ShopeeChannel();
       case ChannelType.TIKTOK:
         return new TikTokChannel();
-
+      case ChannelType.TIKTOK_SHOP:
+        return new TikTokShopChannel();
       // Add more channels here
       // case ChannelType.TOKOPEDIA:
       //   return new TokopediaChannel();
