@@ -263,13 +263,43 @@ export class TikTokShopChannel extends BaseChannel {
   }
 
   private async deleteExpiredState(state: string): Promise<void> {
-    // TODO: Implement TikTok Shop expired state cleanup
-    console.log(`Deleting expired TikTok Shop state: ${state}`);
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      await fetch(`${supabaseUrl}/rest/v1/user_state?state=eq.${state}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log(`🗑️ Deleted expired state from database: ${state}`);
+    } catch (error) {
+      console.error('❌ Error deleting expired state:', error);
+    }
   }
 
   private async cleanupExpiredStates(): Promise<void> {
-    // TODO: Implement TikTok Shop expired states cleanup
-    console.log(`Cleaning up expired TikTok Shop states`);
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+      await fetch(`${supabaseUrl}/rest/v1/user_state?expires_at=lt.${new Date().toISOString()}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log(`🧹 Cleaned up expired OAuth states from database`);
+    } catch (error) {
+      console.error('❌ Error cleaning up expired states:', error);
+    }
   }
 
   // PKCE methods for OAuth security
