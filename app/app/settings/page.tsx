@@ -233,7 +233,17 @@ function SettingsContent() {
                         setMessage({ type: 'error', text: 'Failed to initiate TikTok authentication' });
                       }
                     } else {
-                      await updateChannelConnection(channel.name, true);
+                      try {
+                        const { authLink, state } = await generateChannelAuthLink(channel.name.toLowerCase(), {
+                          userId: session?.user?.id || ""
+                        });
+                        
+                        // State is now stored server-side, no need for cookie
+                        window.location.href = authLink;
+                      } catch (error) {
+                        console.error('Error generating TikTok' + channel.name + 'auth link:', error);
+                        setMessage({ type: 'error', text: 'Failed to initiate ' + channel.name + ' authentication' });
+                      }
                     }
                   }}
                 >

@@ -35,9 +35,7 @@ export class TikTokChannel extends BaseChannel {
 
   extractCredentials(params: Record<string, string>): ChannelCredentials {
     return {
-      api_key: params.code, // TikTok authorization code from OAuth
-      api_secret: params.scopes, // Store granted scopes as api_secret for reference
-      shop_id: params.state // Store state for OAuth validation
+      api_key: params.code
     };
   }
 
