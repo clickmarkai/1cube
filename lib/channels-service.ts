@@ -74,6 +74,8 @@ export const ChannelsService = {
       shop_id?: string;
       api_key?: string;
       api_secret?: string;
+      token?: string;
+      refresh_token?: string;
     }
   ): Promise<TeamChannelConfig> {
     const config: TeamChannelConfig = {
@@ -82,6 +84,8 @@ export const ChannelsService = {
       shop_id: credentials?.shop_id,
       api_key: credentials?.api_key,
       api_secret: credentials?.api_secret,
+      token: credentials?.token,
+      refresh_token: credentials?.refresh_token,
       connected: true,
       last_sync: new Date()
     };
@@ -106,6 +110,8 @@ export const ChannelsService = {
       shop_id?: string;
       api_key?: string;
       api_secret?: string;
+      token?: string;
+      refresh_token?: string;
     }
   ): Promise<TeamChannelConfig | null> {
     return TeamChannelService.updateTeamChannelCredentials(teamId, channelId, credentials);
@@ -178,7 +184,7 @@ export async function getChannelsByUserId(userId: string): Promise<{
       // Default icon mapping
       const iconMap: Record<string, string> = {
         'shopee': '🛒',
-        'tokopedia': '🏪',
+        'tokopedia': '🏪',  
         'bukalapak': '🛍️',
         'tiktok': '🎵'
       };

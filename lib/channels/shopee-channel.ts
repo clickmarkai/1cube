@@ -5,6 +5,9 @@
 
 import crypto from 'crypto';
 import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
+import { ChannelService } from "../channel";
+import { ChannelsService } from "../channels-service";
+import { TeamUserService } from "../team-user";
 
 // Global type declarations for OAuth state storage
 declare global {
@@ -96,10 +99,188 @@ export class ShopeeChannel extends BaseChannel {
     // TODO: Implement Shopee-specific sync logic
   }
 
-  async getProducts(): Promise<any[]> {
-    console.log(`Fetching products from ${this.getName()}...`);
-    // TODO: Implement Shopee-specific product fetching
-    return [];
+  async getProducts(
+    shopId: string, 
+    accessToken: string,
+    options?: {
+      pageSize?: number;
+      itemStatus?: 'NORMAL' | 'SELLER_DELETE' | 'BANNED' | 'UNLIST' | 'SHOPEE_DELETE' | 'REVIEWING';
+      updateTimeFrom?: number; // Unix timestamp
+      updateTimeTo?: number;   // Unix timestamp
+    }
+  ): Promise<any[]> {
+    try {
+      console.log(`Fetching products from ${this.getName()}...`);
+      
+      const pageSize = options?.pageSize || 100; // Default page size
+      const itemStatus = options?.itemStatus || 'NORMAL';
+      let allProducts: any[] = [];
+      let offset = 0;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const apiPath = "/api/v2/product/get_item_list";
+
+        // Generate signature
+        const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
+        const signature = crypto
+          .createHmac('sha256', this.PARTNER_KEY)
+          .update(baseString)
+          .digest('hex');
+
+        // Build query parameters
+        const queryParams = new URLSearchParams({
+          partner_id: this.PARTNER_ID.toString(),
+          sign: signature,
+          timestamp: timestamp.toString(),
+          shop_id: shopId,
+          access_token: accessToken,
+          offset: offset.toString(),
+          page_size: pageSize.toString(),
+          item_status: itemStatus
+        });
+
+        // Add optional date filters if provided
+        if (options?.updateTimeFrom) {
+          queryParams.set('update_time_from', options.updateTimeFrom.toString());
+        }
+        if (options?.updateTimeTo) {
+          queryParams.set('update_time_to', options.updateTimeTo.toString());
+        }
+
+        // Prepare the API URL
+        const url = `${this.HOST}${apiPath}?${queryParams.toString()}`;
+
+        // Make the GET request
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Get products request failed: ${response.status} ${response.statusText}`);
+        }
+
+        const responseData = await response.json();
+        
+        // Check for API error
+        if (responseData.error) {
+          throw new Error(`Shopee API error: ${responseData.error} - ${responseData.message}`);
+        }
+
+        const products = responseData.response?.item || [];
+        allProducts.push(...products);
+
+        // Check pagination
+        hasNextPage = responseData.response?.has_next_page || false;
+        
+        if (hasNextPage) {
+          // Update offset for next page
+          offset += pageSize;
+          console.log(`📦 Fetched ${products.length} products (page ${Math.floor(offset / pageSize)}), continuing...`);
+        } else {
+          console.log(`📦 Fetched ${products.length} products (final page)`);
+        }
+      }
+
+      console.log(`✅ Successfully fetched ${allProducts.length} total products from Shopee shop ${shopId}`);
+      return allProducts;
+      
+    } catch (error) {
+      console.error('❌ Error fetching Shopee products:', error);
+      throw error;
+    }
+  }
+
+  async getProductDetails(
+    shopId: string,
+    accessToken: string,
+    itemIds: number[],
+    options?: {
+      needTaxInfo?: boolean;
+      needComplaintPolicy?: boolean;
+    }
+  ): Promise<any[]> {
+    try {
+      console.log(`Fetching product details from ${this.getName()} for ${itemIds.length} items...`);
+      
+      if (!itemIds || itemIds.length === 0) {
+        throw new Error('At least one item_id is required');
+      }
+
+      // Shopee API supports max 50 items per request
+      const MAX_ITEMS_PER_REQUEST = 50;
+      let allProductDetails: any[] = [];
+
+      // Process items in batches
+      for (let i = 0; i < itemIds.length; i += MAX_ITEMS_PER_REQUEST) {
+        const batchItemIds = itemIds.slice(i, i + MAX_ITEMS_PER_REQUEST);
+        
+        const timestamp = Math.floor(Date.now() / 1000);
+        const apiPath = "/api/v2/product/get_item_base_info";
+
+        // Generate signature
+        const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
+        const signature = crypto
+          .createHmac('sha256', this.PARTNER_KEY)
+          .update(baseString)
+          .digest('hex');
+
+        // Build query parameters
+        const queryParams = new URLSearchParams({
+          partner_id: this.PARTNER_ID.toString(),
+          sign: signature,
+          timestamp: timestamp.toString(),
+          shop_id: shopId,
+          access_token: accessToken,
+          item_id_list: batchItemIds.join(','),
+          need_tax_info: (options?.needTaxInfo ?? true).toString(),
+          need_complaint_policy: (options?.needComplaintPolicy ?? true).toString()
+        });
+
+        // Prepare the API URL
+        const url = `${this.HOST}${apiPath}?${queryParams.toString()}`;
+
+        // Make the GET request
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Get product details request failed: ${response.status} ${response.statusText}`);
+        }
+
+        const responseData = await response.json();
+        
+        // Check for API error
+        if (responseData.error) {
+          throw new Error(`Shopee API error: ${responseData.error} - ${responseData.message}`);
+        }
+
+        const productDetails = responseData.response?.item_list || [];
+        allProductDetails.push(...productDetails);
+
+        console.log(`📦 Fetched details for ${productDetails.length} products (batch ${Math.floor(i / MAX_ITEMS_PER_REQUEST) + 1})`);
+        
+        // Add small delay between batches to avoid rate limiting
+        if (i + MAX_ITEMS_PER_REQUEST < itemIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      console.log(`✅ Successfully fetched details for ${allProductDetails.length} total products from Shopee shop ${shopId}`);
+      return allProductDetails;
+      
+    } catch (error) {
+      console.error('❌ Error fetching Shopee product details:', error);
+      throw error;
+    }
   }
 
   async getOrders(): Promise<any[]> {
@@ -242,6 +423,170 @@ export class ShopeeChannel extends BaseChannel {
       console.log(`🧹 Cleaned up expired OAuth states from database`);
     } catch (error) {
       console.error('❌ Error cleaning up expired states:', error);
+    }
+  }
+
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const apiPath = "/api/v2/auth/token/get";
+      
+      // Get shop_id and code from the tokenMap
+      const shopId = tokenMap.get('shop_id');
+      const code = tokenMap.get('code');
+      
+      if (!shopId || !code) {
+        throw new Error('Missing shop_id or code in tokenMap');
+      }
+
+      // Generate signature
+      const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
+      const signature = crypto
+        .createHmac('sha256', this.PARTNER_KEY)
+        .update(baseString)
+        .digest('hex');
+
+      // Prepare the API URL
+      const url = `${this.HOST}${apiPath}?partner_id=${this.PARTNER_ID}&sign=${signature}&timestamp=${timestamp}`;
+      
+      // Prepare the request body
+      const requestBody = {
+        shop_id: parseInt(shopId),
+        code: code
+      };
+
+      // Make the POST request
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Token request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const tokenData = await response.json();
+      
+      console.log(`✅ Successfully retrieved Shopee token for shop ${shopId}`);
+      
+      // Return both access token and refresh token
+      return {
+        access_token: tokenData.access_token || '',
+        refresh_token: tokenData.refresh_token
+      };
+    } catch (error) {
+      console.error('❌ Error getting Shopee token:', error);
+      throw error;
+    }
+  }
+
+  async refreshToken(shopId: string, refreshToken: string): Promise<{access_token: string, refresh_token?: string}> {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const apiPath = "/api/v2/auth/access_token/get";
+      
+      if (!shopId || !refreshToken) {
+        throw new Error('Missing shop_id or refresh_token');
+      }
+
+      // Generate signature
+      const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
+      const signature = crypto
+        .createHmac('sha256', this.PARTNER_KEY)
+        .update(baseString)
+        .digest('hex');
+
+      // Prepare the API URL
+      const url = `${this.HOST}${apiPath}?partner_id=${this.PARTNER_ID}&sign=${signature}&timestamp=${timestamp}`;
+      
+      // Prepare the request body
+      const requestBody = {
+        partner_id: this.PARTNER_ID,
+        shop_id: parseInt(shopId),
+        refresh_token: refreshToken
+      };
+
+      // Make the POST request
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Refresh token request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const tokenData = await response.json();
+      
+      console.log(`✅ Successfully refreshed Shopee token for shop ${shopId}`);
+      
+      // Return both new access token and refresh token
+      return {
+        access_token: tokenData.access_token || '',
+        refresh_token: tokenData.refresh_token
+      };
+    } catch (error) {
+      console.error('❌ Error refreshing Shopee token:', error);
+      throw error;
+    }
+  }
+
+  // Override connectToDatabase to call getToken and save tokens
+  protected async connectToDatabase(credentials: ChannelCredentials, userId: string): Promise<void> {
+    try {
+      // Get channel from database
+      const channelData = await ChannelService.getChannelTypeByName(this.channelName);
+      if (!channelData) {
+        throw new Error(`Channel ${this.channelName} not found in database`);
+      }
+
+      // Get team ID for the user
+      const DEFAULT_TEAM_ID = "4aaa07c6-8291-441d-bcf6-1b6621bb27d1";
+      let teamId: string;
+      try {
+        const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
+        teamId = userTeamId || DEFAULT_TEAM_ID;
+        
+        if (!userTeamId) {
+          console.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
+        }
+      } catch (error) {
+        console.error(`Error getting team for user ${userId}:`, error);
+        teamId = DEFAULT_TEAM_ID;
+      }
+
+      // Call getToken API to get access and refresh tokens
+      const tokenMap = new Map<string, string>();
+      tokenMap.set('shop_id', credentials.shop_id || '');
+      tokenMap.set('code', credentials.api_key || ''); // Shopee uses code as api_key
+      
+      console.log(`🔑 Calling Shopee getToken API for shop ${credentials.shop_id}`);
+      const tokens = await this.getToken(tokenMap);
+      
+      // Update credentials with the retrieved tokens
+      const updatedCredentials = {
+        shop_id: credentials.shop_id,
+        token: tokens.access_token,
+        refresh_token: tokens.refresh_token
+      };
+
+      // Connect team to channel with tokens
+      await ChannelsService.connectTeamToChannel(
+        teamId,
+        channelData.id,
+        updatedCredentials
+      );
+
+      console.log(`Successfully connected ${this.channelName} for user ${userId} in team ${teamId} with tokens`);
+    } catch (error) {
+      console.error(`❌ Error in Shopee connectToDatabase:`, error);
+      throw error;
     }
   }
 }

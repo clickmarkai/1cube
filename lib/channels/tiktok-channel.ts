@@ -222,7 +222,7 @@ export class TikTokChannel extends BaseChannel {
     console.log(`Syncing ${this.getName()} data...`);
   }
 
-  async getProducts(): Promise<any[]> {
+  async getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]> {
     // TODO: Implement TikTok-specific product fetching
     console.log(`Fetching products from ${this.getName()}...`);
     return [];
@@ -257,6 +257,11 @@ export class TikTokChannel extends BaseChannel {
     // TODO: Implement TikTok ad campaigns fetching
     console.log(`Fetching ad campaigns from ${this.getName()}...`);
     return [];
+  }
+
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+    // Implementation to be added
+    return { access_token: '' };
   }
 
   // Database-based session state and code verifier storage

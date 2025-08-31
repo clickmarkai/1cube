@@ -14,6 +14,8 @@ export interface ChannelCredentials {
   shop_id?: string;
   api_key?: string;
   api_secret?: string;
+  token?: string;
+  refresh_token?: string;
 }
 
 export interface ChannelConfig {
@@ -55,7 +57,7 @@ export abstract class BaseChannel {
   
   // Additional abstract methods for channel operations
   abstract sync(): Promise<void>;
-  abstract getProducts(): Promise<any[]>;
+  abstract getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]>;
   abstract getOrders(): Promise<any[]>;
 
   // Concrete methods - shared by all channels
@@ -63,7 +65,6 @@ export abstract class BaseChannel {
     try {
       // Extract parameters from URL
       const params = this.extractParams(request);
-      console.log("Debug Param Edgar: " + JSON.stringify(params));
       // Check for OAuth errors
       if (params.error) {
         return this.createErrorRedirect(request, `OAuth error: ${params.error_description || params.error}`);
@@ -208,4 +209,6 @@ export abstract class BaseChannel {
     // return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
     // return `${process.env.BASE_URL || 'http://localhost:3000'}/api/callback/auth/${this.channelName.toLowerCase()}`;
   }
+
+  abstract getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}>;
 }
