@@ -27,14 +27,15 @@ export class TikTokShopChannel extends BaseChannel {
     const config: ChannelConfig = {
       name: 'TikTok Shop',
       description: 'TikTok\'s e-commerce platform for selling products directly on TikTok',
-      requiredFields: ['shop_id', 'api_key']
+      requiredFields: []
     };
 
-    super('tiktok-shop', config);
+    super('tiktok shop', config);
   }
 
   extractCredentials(params: Record<string, string>): ChannelCredentials {
     return {
+      shop_id: params.app_key,
       api_key: params.code
     };
   }
@@ -70,7 +71,7 @@ export class TikTokShopChannel extends BaseChannel {
     const state = this.generateState(params.userId);
     const authLink = 'https://services.tiktokshop.com/open/authorize?service_id=' + this.SERVICE_ID;
     
-    await this.storeSessionState(state, params.userId, 'tiktok-shop');
+    await this.storeSessionState(state, params.userId, 'tiktok shop');
 
     return { authLink, state };
   }
@@ -245,7 +246,7 @@ export class TikTokShopChannel extends BaseChannel {
       }
 
       // Verify channel matches
-      if (storedState.channel_name !== 'tiktok-shop') {
+      if (storedState.channel_name !== 'tiktok shop') {
         console.log('❌ OAuth state channel mismatch');
         return { valid: false, error: 'OAuth state channel mismatch' };
       }
