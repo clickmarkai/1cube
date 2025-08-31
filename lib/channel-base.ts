@@ -57,7 +57,7 @@ export abstract class BaseChannel {
   
   // Additional abstract methods for channel operations
   abstract sync(): Promise<void>;
-  abstract getProducts(): Promise<any[]>;
+  abstract getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]>;
   abstract getOrders(): Promise<any[]>;
 
   // Concrete methods - shared by all channels

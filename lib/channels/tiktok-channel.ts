@@ -222,7 +222,7 @@ export class TikTokChannel extends BaseChannel {
     console.log(`Syncing ${this.getName()} data...`);
   }
 
-  async getProducts(): Promise<any[]> {
+  async getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]> {
     // TODO: Implement TikTok-specific product fetching
     console.log(`Fetching products from ${this.getName()}...`);
     return [];
