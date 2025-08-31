@@ -259,6 +259,11 @@ export class TikTokChannel extends BaseChannel {
     return [];
   }
 
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+    // Implementation to be added
+    return { access_token: '' };
+  }
+
   // Database-based session state and code verifier storage
   private async storeSessionStateWithVerifier(state: string, userId: string, channelName: string, codeVerifier: string): Promise<void> {
     try {

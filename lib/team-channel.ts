@@ -21,6 +21,8 @@ export interface TeamChannelConfig {
   api_secret?: string;    // api secret
   connected: boolean;     // connection status
   last_sync?: Date;       // last sync date
+  token?: string;         // token
+  refresh_token?: string; // refresh token
 }
 
 export const TeamChannelService = {
@@ -45,6 +47,8 @@ export const TeamChannelService = {
         shop_id: tc.shop_id || undefined,
         api_key: tc.api_key || undefined,
         api_secret: tc.api_secret || undefined,
+        token: tc.token || undefined,
+        refresh_token: tc.refresh_token || undefined,
         connected: tc.connected || false,
         last_sync: tc.last_sync ? new Date(tc.last_sync) : undefined
       }));
@@ -83,6 +87,8 @@ export const TeamChannelService = {
         shop_id: data.shop_id || undefined,
         api_key: data.api_key || undefined,
         api_secret: data.api_secret || undefined,
+        token: data.token || undefined,
+        refresh_token: data.refresh_token || undefined,
         connected: data.connected || false,
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
@@ -115,6 +121,8 @@ export const TeamChannelService = {
             shop_id: config.shop_id,
             api_key: config.api_key,
             api_secret: config.api_secret,
+            token: config.token,
+            refresh_token: config.refresh_token,
             connected: config.connected,
             last_sync: config.last_sync?.toISOString(),
             updated_at: new Date().toISOString()
@@ -138,6 +146,8 @@ export const TeamChannelService = {
             shop_id: config.shop_id,
             api_key: config.api_key,
             api_secret: config.api_secret,
+            token: config.token,
+            refresh_token: config.refresh_token,
             connected: config.connected,
             last_sync: config.last_sync?.toISOString()
           })
@@ -156,6 +166,8 @@ export const TeamChannelService = {
         shop_id: result.shop_id || undefined,
         api_key: result.api_key || undefined,
         api_secret: result.api_secret || undefined,
+        token: result.token || undefined,
+        refresh_token: result.refresh_token || undefined,
         connected: result.connected || false,
         last_sync: result.last_sync ? new Date(result.last_sync) : undefined
       };
@@ -194,7 +206,7 @@ export const TeamChannelService = {
   async updateTeamChannelCredentials(
     teamId: string, 
     channelId: string, 
-    credentials: { shop_id?: string; api_key?: string; api_secret?: string }
+    credentials: { shop_id?: string; api_key?: string; api_secret?: string; token?: string; refresh_token?: string }
   ): Promise<TeamChannelConfig | null> {
     try {
       const { data, error } = await supabase
@@ -203,6 +215,8 @@ export const TeamChannelService = {
           shop_id: credentials.shop_id,
           api_key: credentials.api_key,
           api_secret: credentials.api_secret,
+          token: credentials.token,
+          refresh_token: credentials.refresh_token,
           updated_at: new Date().toISOString()
         })
         .eq('team_id', teamId)
@@ -227,6 +241,8 @@ export const TeamChannelService = {
         shop_id: data.shop_id || undefined,
         api_key: data.api_key || undefined,
         api_secret: data.api_secret || undefined,
+        token: data.token || undefined,
+        refresh_token: data.refresh_token || undefined,
         connected: data.connected || false,
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
@@ -275,6 +291,8 @@ export const TeamChannelService = {
         shop_id: data.shop_id || undefined,
         api_key: data.api_key || undefined,
         api_secret: data.api_secret || undefined,
+        token: data.token || undefined,
+        refresh_token: data.refresh_token || undefined,
         connected: data.connected || false,
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };

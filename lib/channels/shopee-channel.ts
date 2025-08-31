@@ -5,6 +5,9 @@
 
 import crypto from 'crypto';
 import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
+import { ChannelService } from "../channel";
+import { ChannelsService } from "../channels-service";
+import { TeamUserService } from "../team-user";
 
 // Global type declarations for OAuth state storage
 declare global {
@@ -242,6 +245,116 @@ export class ShopeeChannel extends BaseChannel {
       console.log(`🧹 Cleaned up expired OAuth states from database`);
     } catch (error) {
       console.error('❌ Error cleaning up expired states:', error);
+    }
+  }
+
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const apiPath = "/api/v2/auth/token/get";
+      
+      // Get shop_id and code from the tokenMap
+      const shopId = tokenMap.get('shop_id');
+      const code = tokenMap.get('code');
+      
+      if (!shopId || !code) {
+        throw new Error('Missing shop_id or code in tokenMap');
+      }
+
+      // Generate signature
+      const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
+      const signature = crypto
+        .createHmac('sha256', this.PARTNER_KEY)
+        .update(baseString)
+        .digest('hex');
+
+      // Prepare the API URL
+      const url = `${this.HOST}${apiPath}?partner_id=${this.PARTNER_ID}&sign=${signature}&timestamp=${timestamp}`;
+      
+      // Prepare the request body
+      const requestBody = {
+        shop_id: parseInt(shopId),
+        code: code
+      };
+
+      // Make the POST request
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Token request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const tokenData = await response.json();
+      
+      console.log(`✅ Successfully retrieved Shopee token for shop ${shopId}`);
+      
+      // Return both access token and refresh token
+      return {
+        access_token: tokenData.access_token || '',
+        refresh_token: tokenData.refresh_token
+      };
+    } catch (error) {
+      console.error('❌ Error getting Shopee token:', error);
+      throw error;
+    }
+  }
+
+  // Override connectToDatabase to call getToken and save tokens
+  protected async connectToDatabase(credentials: ChannelCredentials, userId: string): Promise<void> {
+    try {
+      // Get channel from database
+      const channelData = await ChannelService.getChannelTypeByName(this.channelName);
+      if (!channelData) {
+        throw new Error(`Channel ${this.channelName} not found in database`);
+      }
+
+      // Get team ID for the user
+      const DEFAULT_TEAM_ID = "4aaa07c6-8291-441d-bcf6-1b6621bb27d1";
+      let teamId: string;
+      try {
+        const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
+        teamId = userTeamId || DEFAULT_TEAM_ID;
+        
+        if (!userTeamId) {
+          console.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
+        }
+      } catch (error) {
+        console.error(`Error getting team for user ${userId}:`, error);
+        teamId = DEFAULT_TEAM_ID;
+      }
+
+      // Call getToken API to get access and refresh tokens
+      const tokenMap = new Map<string, string>();
+      tokenMap.set('shop_id', credentials.shop_id || '');
+      tokenMap.set('code', credentials.api_key || ''); // Shopee uses code as api_key
+      
+      console.log(`🔑 Calling Shopee getToken API for shop ${credentials.shop_id}`);
+      const tokens = await this.getToken(tokenMap);
+      
+      // Update credentials with the retrieved tokens
+      const updatedCredentials = {
+        shop_id: credentials.shop_id,
+        token: tokens.access_token,
+        refresh_token: tokens.refresh_token
+      };
+
+      // Connect team to channel with tokens
+      await ChannelsService.connectTeamToChannel(
+        teamId,
+        channelData.id,
+        updatedCredentials
+      );
+
+      console.log(`Successfully connected ${this.channelName} for user ${userId} in team ${teamId} with tokens`);
+    } catch (error) {
+      console.error(`❌ Error in Shopee connectToDatabase:`, error);
+      throw error;
     }
   }
 }

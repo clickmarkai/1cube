@@ -320,4 +320,9 @@ export class TikTokShopChannel extends BaseChannel {
     console.log(`Retrieving code verifier for TikTok Shop state: ${state}`);
     return null;
   }
+
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+    // Implementation to be added
+    return { access_token: '' };
+  }
 }
