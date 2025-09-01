@@ -6,6 +6,87 @@
 import crypto from 'crypto';
 import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
 
+// TikTok Shop API request options interface
+interface TikTokShopRequestOptions {
+  uri: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  qs?: Record<string, any>;
+  headers?: Record<string, string>;
+  body?: Record<string, any>;
+}
+
+// TikTok Shop Product Search Options interface
+interface TikTokShopProductSearchOptions {
+  pageSize?: number;
+  pageToken?: string;
+  status?: 'ALL' | 'LIVE' | 'DRAFT' | 'DELETED';
+  sellerSkus?: string[];
+  createTimeGe?: number; // Unix timestamp
+  createTimeLe?: number; // Unix timestamp
+  updateTimeGe?: number; // Unix timestamp
+  updateTimeLe?: number; // Unix timestamp
+  categoryVersion?: string;
+  listingQualityTiers?: ('POOR' | 'FAIR' | 'GOOD' | 'EXCELLENT')[];
+  listingPlatforms?: ('TIKTOK_SHOP' | 'SHOPIFY')[];
+  auditStatus?: ('AUDITING' | 'APPROVED' | 'REJECTED')[];
+  skuIds?: string[];
+  returnDraftVersion?: boolean;
+}
+
+// TikTok Shop Single Product Get Options interface
+interface TikTokShopProductGetOptions {
+  returnUnderReviewVersion?: boolean;
+  returnDraftVersion?: boolean;
+}
+
+// Sign generation for TikTok Shop API requests
+const excludeKeys = ["access_token", "sign"] as const;
+
+export const generateSign = (
+  requestOption: TikTokShopRequestOptions,
+  app_secret: string
+) => {
+  let signString = "";
+  // step1: Extract all query parameters excluding sign and access_token. Reorder the parameter keys in alphabetical order:
+  const params = requestOption.qs || {};
+  const sortedParams = Object.keys(params)
+    .filter((key) => !excludeKeys.includes(key as any))
+    .sort()
+    .map((key) => ({ key, value: params[key] }));
+  
+  //step2: Concatenate all the parameters in the format {key}{value}:
+  const paramString = sortedParams
+    .map(({ key, value }) => `${key}${value}`)
+    .join("");
+  
+  signString += paramString;
+  
+  //step3: Append the string from Step 2 to the API request path:
+  const pathname = new URL(requestOption.uri).pathname;
+  
+  signString = `${pathname}${paramString}`;
+  
+  //step4: If the request header content-type is not multipart/form-data, append the API request body to the string from Step 3:
+  if (
+    requestOption.headers?.["content-type"] !== "multipart/form-data" &&
+    requestOption.body &&
+    Object.keys(requestOption.body).length
+  ) {
+    const body = JSON.stringify(requestOption.body);
+    signString += body;
+  }
+  
+  //step5: Wrap the string generated in Step 4 with the app_secret:
+  signString = `${app_secret}${signString}${app_secret}`;
+  
+  //step6: Encode your wrapped string using HMAC-SHA256:
+  const hmac = crypto.createHmac("sha256", app_secret);
+  hmac.update(signString);
+  const sign = hmac.digest("hex");
+  
+  return sign;
+};
+
 // Global type declarations for OAuth state storage
 declare global {
   var oauthStates: Map<string, {
@@ -59,7 +140,7 @@ export class TikTokShopChannel extends BaseChannel {
 
     // Verify OAuth state parameter for security
     const stateVerification = await this.verifySessionState(params.state);
-    if (!stateVerification.valid) {
+    if (!stateVerification.valid) { 
       return { valid: false, error: stateVerification.error || 'Invalid OAuth state for TikTok' };
     }
 
@@ -76,16 +157,204 @@ export class TikTokShopChannel extends BaseChannel {
     return { authLink, state };
   }
 
+  private async makeAuthenticatedRequest(
+    endpoint: string,
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+    accessToken?: string,
+    queryParams: Record<string, any> = {},
+    body?: Record<string, any>,
+    apiVersion: string = '202502'
+  ): Promise<any> {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const uri = `${this.HOST}${endpoint}`;
+      
+      const baseParams: Record<string, any> = {
+        app_key: this.APP_KEY,
+        timestamp: timestamp.toString(),
+        ...queryParams
+      };
+
+      // Prepare headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      // Add access token to headers if provided
+      if (accessToken) {
+        headers['x-tts-access-token'] = accessToken;
+      }
+
+      // Prepare request options for sign generation
+      const requestOptions: TikTokShopRequestOptions = {
+        uri,
+        method,
+        qs: baseParams,
+        headers
+      };
+
+      // Add body if provided
+      if (body && (method === 'POST' || method === 'PUT')) {
+        requestOptions.body = body;
+      }
+
+      // Generate signature
+      const sign = generateSign(requestOptions, this.APP_SECRET);
+      requestOptions.qs!.sign = sign;
+
+      // Build the final URL with query parameters
+      const url = new URL(uri);
+      if (requestOptions.qs) {
+        Object.entries(requestOptions.qs).forEach(([key, value]) => {
+          url.searchParams.append(key, value.toString());
+        });
+      }
+
+      // Prepare fetch options
+      const fetchOptions: RequestInit = {
+        method,
+        headers: requestOptions.headers
+      };
+
+      // Add body for POST/PUT requests
+      if (body && (method === 'POST' || method === 'PUT')) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      // Make the API request
+      const response = await fetch(url.toString(), fetchOptions);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`TikTok Shop API error: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      // Check for API-level errors
+      if (data.code !== 0) {
+        throw new Error(`TikTok Shop API error: ${data.message || 'Unknown error'}`);
+      }
+
+      return data.data || data;
+    } catch (error) {
+      console.error('TikTok Shop API request failed:', error);
+      throw error;
+    }
+  }
+
   // TikTok Shop-specific methods
   async sync(): Promise<void> {
     // TODO: Implement TikTok Shop-specific sync logic
     console.log(`Syncing ${this.getName()} data...`);
   }
 
-  async getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]> {
-    // TODO: Implement TikTok Shop-specific product fetching
-    console.log(`Fetching products from ${this.getName()}...`);
-    return [];
+  async getProducts(shopCipher: string, accessToken: string, options?: TikTokShopProductSearchOptions): Promise<any[]> {
+    try {
+      // Query parameters for the URL
+      const queryParams = {
+        shop_cipher: shopCipher,
+        page_size: options?.pageSize || 100,
+        page_token: options?.pageToken || ''
+      };
+
+      // Request body with all the search criteria
+      const requestBody: Record<string, any> = {
+        status: options?.status || 'ALL'
+      };
+
+      // Add optional search parameters to the request body
+      if (options?.sellerSkus && Array.isArray(options.sellerSkus)) {
+        requestBody.seller_skus = options.sellerSkus;
+      }
+
+      if (options?.createTimeGe) {
+        requestBody.create_time_ge = options.createTimeGe;
+      }
+
+      if (options?.createTimeLe) {
+        requestBody.create_time_le = options.createTimeLe;
+      }
+
+      if (options?.updateTimeGe) {
+        requestBody.update_time_ge = options.updateTimeGe;
+      }
+
+      if (options?.updateTimeLe) {
+        requestBody.update_time_le = options.updateTimeLe;
+      }
+
+      if (options?.categoryVersion) {
+        requestBody.category_version = options.categoryVersion;
+      }
+
+      if (options?.listingQualityTiers && Array.isArray(options.listingQualityTiers)) {
+        requestBody.listing_quality_tiers = options.listingQualityTiers;
+      }
+
+      if (options?.listingPlatforms && Array.isArray(options.listingPlatforms)) {
+        requestBody.listing_platforms = options.listingPlatforms;
+      }
+
+      if (options?.auditStatus && Array.isArray(options.auditStatus)) {
+        requestBody.audit_status = options.auditStatus;
+      }
+
+      if (options?.skuIds && Array.isArray(options.skuIds)) {
+        requestBody.sku_ids = options.skuIds;
+      }
+
+      if (typeof options?.returnDraftVersion === 'boolean') {
+        requestBody.return_draft_version = options.returnDraftVersion;
+      }
+
+      const response = await this.makeAuthenticatedRequest(
+        '/product/202502/products/search',
+        'POST',
+        accessToken,
+        queryParams,
+        requestBody
+      );
+
+      console.log(`Successfully fetched ${response.products?.length || 0} products from ${this.getName()}`);
+      return response.products || [];
+    } catch (error) {
+      console.error(`Error fetching products from ${this.getName()}:`, error);
+      throw error;
+    }
+  }
+
+  async getProduct(productId: string, shopCipher: string, accessToken: string, options?: TikTokShopProductGetOptions): Promise<any> {
+    try {
+      // Query parameters for the URL
+      const queryParams: Record<string, any> = {
+        shop_cipher: shopCipher
+      };
+
+      // Add optional parameters
+      if (typeof options?.returnUnderReviewVersion === 'boolean') {
+        queryParams.return_under_review_version = options.returnUnderReviewVersion;
+      }
+
+      if (typeof options?.returnDraftVersion === 'boolean') {
+        queryParams.return_draft_version = options.returnDraftVersion;
+      }
+
+      const response = await this.makeAuthenticatedRequest(
+        `/product/202309/products/${productId}`,
+        'GET',
+        accessToken,
+        queryParams,
+        undefined, // No body for GET request
+        '202309' // API version for single product endpoint
+      );
+
+      console.log(`Successfully fetched product ${productId} from ${this.getName()}`);
+      return response.product || response;
+    } catch (error) {
+      console.error(`Error fetching product ${productId} from ${this.getName()}:`, error);
+      throw error;
+    }
   }
 
   async getOrders(): Promise<any[]> {
@@ -323,7 +592,35 @@ export class TikTokShopChannel extends BaseChannel {
   }
 
   async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
-    // Implementation to be added
-    return { access_token: '' };
+    try {
+      const authCode = tokenMap.get('code');
+      if (!authCode) {
+        throw new Error('Authorization code is required for TikTok Shop token exchange');
+      }
+
+      const tokenData = {
+        app_key: this.APP_KEY,
+        auth_code: authCode,
+        grant_type: 'authorized_code'
+      };
+
+      const response = await this.makeAuthenticatedRequest(
+        '/authorization/202309/token/get',
+        'POST',
+        undefined, // No access token needed for token exchange
+        {},
+        tokenData
+      );
+
+      console.log(`Successfully obtained access token from ${this.getName()}`);
+      
+      return {
+        access_token: response.access_token,
+        refresh_token: response.refresh_token
+      };
+    } catch (error) {
+      console.error(`Error getting token from ${this.getName()}:`, error);
+      throw error;
+    }
   }
 }
