@@ -33,6 +33,8 @@ export class TikTokChannel extends BaseChannel {
     super('tiktok', config);
   }
 
+
+
   extractCredentials(params: Record<string, string>): ChannelCredentials {
     return {
       api_key: params.code

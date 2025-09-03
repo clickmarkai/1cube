@@ -114,6 +114,8 @@ export class TikTokShopChannel extends BaseChannel {
     super('tiktok shop', config);
   }
 
+
+
   extractCredentials(params: Record<string, string>): ChannelCredentials {
     return {
       shop_id: params.app_key,
@@ -157,91 +159,7 @@ export class TikTokShopChannel extends BaseChannel {
     return { authLink, state };
   }
 
-  private async makeAuthenticatedRequest(
-    endpoint: string,
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-    accessToken?: string,
-    queryParams: Record<string, any> = {},
-    body?: Record<string, any>,
-    apiVersion: string = '202502'
-  ): Promise<any> {
-    try {
-      const timestamp = Math.floor(Date.now() / 1000);
-      const uri = `${this.HOST}${endpoint}`;
-      
-      const baseParams: Record<string, any> = {
-        app_key: this.APP_KEY,
-        timestamp: timestamp.toString(),
-        ...queryParams
-      };
 
-      // Prepare headers
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-
-      // Add access token to headers if provided
-      if (accessToken) {
-        headers['x-tts-access-token'] = accessToken;
-      }
-
-      // Prepare request options for sign generation
-      const requestOptions: TikTokShopRequestOptions = {
-        uri,
-        method,
-        qs: baseParams,
-        headers
-      };
-
-      // Add body if provided
-      if (body && (method === 'POST' || method === 'PUT')) {
-        requestOptions.body = body;
-      }
-
-      // Generate signature
-      const sign = generateSign(requestOptions, this.APP_SECRET);
-      requestOptions.qs!.sign = sign;
-
-      // Build the final URL with query parameters
-      const url = new URL(uri);
-      if (requestOptions.qs) {
-        Object.entries(requestOptions.qs).forEach(([key, value]) => {
-          url.searchParams.append(key, value.toString());
-        });
-      }
-
-      // Prepare fetch options
-      const fetchOptions: RequestInit = {
-        method,
-        headers: requestOptions.headers
-      };
-
-      // Add body for POST/PUT requests
-      if (body && (method === 'POST' || method === 'PUT')) {
-        fetchOptions.body = JSON.stringify(body);
-      }
-
-      // Make the API request
-      const response = await fetch(url.toString(), fetchOptions);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`TikTok Shop API error: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      // Check for API-level errors
-      if (data.code !== 0) {
-        throw new Error(`TikTok Shop API error: ${data.message || 'Unknown error'}`);
-      }
-
-      return data.data || data;
-    } catch (error) {
-      console.error('TikTok Shop API request failed:', error);
-      throw error;
-    }
-  }
 
   // TikTok Shop-specific methods
   async sync(): Promise<void> {
@@ -309,11 +227,14 @@ export class TikTokShopChannel extends BaseChannel {
       }
 
       const response = await this.makeAuthenticatedRequest(
+        this.HOST,
         '/product/202502/products/search',
+        this.APP_KEY,
+        (requestOptions) => generateSign(requestOptions, this.APP_SECRET),
         'POST',
-        accessToken,
         queryParams,
-        requestBody
+        requestBody,
+        accessToken ? { 'x-tts-access-token': accessToken } : {}
       );
 
       console.log(`Successfully fetched ${response.products?.length || 0} products from ${this.getName()}`);
@@ -341,12 +262,14 @@ export class TikTokShopChannel extends BaseChannel {
       }
 
       const response = await this.makeAuthenticatedRequest(
+        this.HOST,
         `/product/202309/products/${productId}`,
+        this.APP_KEY,
+        (requestOptions) => generateSign(requestOptions, this.APP_SECRET),
         'GET',
-        accessToken,
         queryParams,
         undefined, // No body for GET request
-        '202309' // API version for single product endpoint
+        accessToken ? { 'x-tts-access-token': accessToken } : {}
       );
 
       console.log(`Successfully fetched product ${productId} from ${this.getName()}`);
@@ -605,11 +528,14 @@ export class TikTokShopChannel extends BaseChannel {
       };
 
       const response = await this.makeAuthenticatedRequest(
+        this.HOST,
         '/authorization/202309/token/get',
+        this.APP_KEY,
+        (requestOptions) => generateSign(requestOptions, this.APP_SECRET),
         'POST',
-        undefined, // No access token needed for token exchange
         {},
-        tokenData
+        tokenData,
+        {} // No access token needed for token exchange
       );
 
       console.log(`Successfully obtained access token from ${this.getName()}`);

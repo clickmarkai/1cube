@@ -211,4 +211,91 @@ export abstract class BaseChannel {
   }
 
   abstract getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}>;
+
+  // Shared authenticated request method
+  protected async makeAuthenticatedRequest(
+    host: string,
+    endpoint: string,
+    appKey: string,
+    signatureGenerator: (requestOptions: any) => string,
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+    queryParams: Record<string, any> = {},
+    body?: Record<string, any>,
+    headers: Record<string, string> = {}
+  ): Promise<any> {
+    try {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const uri = `${host}${endpoint}`;
+      
+      const baseParams: Record<string, any> = {
+        ...queryParams
+      };
+      
+      // Add timestamp - all channels use this
+      baseParams.timestamp = timestamp.toString();
+      
+      // Add channel-specific key parameter
+      if (appKey) {
+        // For TikTok Shop: app_key, for Shopee: partner_id
+        const keyParam = this.channelName === 'shopee' ? 'partner_id' : 'app_key';
+        baseParams[keyParam] = appKey;
+      }
+
+      // Prepare headers
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...headers
+      };
+
+      // Prepare request options for signature generation
+      const requestOptions = {
+        uri,
+        method,
+        qs: baseParams,
+        headers: requestHeaders,
+        body: body
+      };
+
+      // Generate channel-specific signature using provided function
+      const signature = signatureGenerator(requestOptions);
+      requestOptions.qs.sign = signature;
+
+      // Build the final URL with query parameters
+      const url = new URL(uri);
+      Object.entries(requestOptions.qs).forEach(([key, value]) => {
+        url.searchParams.append(key, value.toString());
+      });
+
+      // Prepare fetch options
+      const fetchOptions: RequestInit = {
+        method,
+        headers: requestOptions.headers
+      };
+
+      // Add body for POST/PUT requests
+      if (body && (method === 'POST' || method === 'PUT')) {
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      // Make the API request
+      const response = await fetch(url.toString(), fetchOptions);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`${this.getName()} API error: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      // Check for API-level errors (adjust this based on your API response format)
+      if (data.code !== undefined && data.code !== 0) {
+        throw new Error(`${this.getName()} API error: ${data.message || 'Unknown error'}`);
+      }
+
+      return data.data || data;
+    } catch (error) {
+      console.error(`${this.getName()} API request failed:`, error);
+      throw error;
+    }
+  }
 }
