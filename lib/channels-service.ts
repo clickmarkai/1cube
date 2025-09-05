@@ -3,9 +3,7 @@
  * Provides the interface you want while working with existing database schema
  */
 
-import { ChannelService, ChannelType } from "./channel";
-import { TeamChannelService, TeamChannelConfig } from "./team-channel";
-import { TeamUserService } from "./team-user";
+import { ChannelService, ChannelType, TeamChannelService, TeamChannelConfig, TeamUserService } from "./repositories";
 import { ChannelInfo } from "./channels";
 import { channelsLogger } from "./logger";
 

@@ -12,15 +12,12 @@ export enum ChannelType {
   SHOPEE = 'shopee',
   TIKTOK = 'tiktok',
   TIKTOK_SHOP = 'tiktok shop'
-  // Add more channels here as needed
-  // TOKOPEDIA = 'tokopedia'
 }
 
 export class ChannelFactory {
   private static instances: Map<ChannelType, BaseChannel> = new Map();
 
   static getChannel(channel: ChannelType | string): BaseChannel {
-    // Handle both enum and string inputs
     let channelEnum: ChannelType;
 
     if (typeof channel === 'string') {
@@ -32,7 +29,6 @@ export class ChannelFactory {
       channelEnum = channel;
     }
 
-    // Singleton pattern - reuse instances
     if (!this.instances.has(channelEnum)) {
       const instance = this.createChannelInstance(channelEnum);
       this.instances.set(channelEnum, instance);
@@ -49,9 +45,6 @@ export class ChannelFactory {
         return new TikTokChannel();
       case ChannelType.TIKTOK_SHOP:
         return new TikTokShopChannel();
-      // Add more channels here
-      // case ChannelType.TOKOPEDIA:
-      //   return new TokopediaChannel();
 
       default:
         throw new Error(`Unsupported channel: ${channel}`);
@@ -80,7 +73,6 @@ export class ChannelFactory {
   }
 }
 
-// Legacy compatibility interface for settings page
 export interface ChannelInfo {
   id: string;
   name: string;
@@ -89,10 +81,8 @@ export interface ChannelInfo {
   lastSync?: Date;
 }
 
-// Export alias for backward compatibility  
 export type Channel = ChannelInfo;
 
-// Legacy compatibility function for settings page
 export async function generateChannelAuthLink(
   channelName: string,
   params: AuthLinkParams

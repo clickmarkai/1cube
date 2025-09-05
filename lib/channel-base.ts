@@ -8,8 +8,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth.config";
 import { ChannelsService } from "./channels-service";
 import { channelsLogger } from "./logger";
-import { ChannelService } from "./channel";
-import { TeamUserService } from "./team-user";
+import { ChannelService } from "./repositories";
+import { TeamUserService } from "./repositories";
 
 export interface ChannelCredentials {
   shop_id?: string;

@@ -5,9 +5,8 @@
 
 import crypto from 'crypto';
 import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
-import { ChannelService } from "../channel";
+import { ChannelService, TeamUserService } from "../repositories";
 import { ChannelsService } from "../channels-service";
-import { TeamUserService } from "../team-user";
 import { channelsLogger } from "@/lib/logger";
 
 // Global type declarations for OAuth state storage

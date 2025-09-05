@@ -1,18 +1,12 @@
 /**
- * Team-Channel Service
+ * Team-Channel Repository
  * Manages the relationship between teams and channels using Supabase
  * Works with the team_channel table structure:
  * - team_id (uuid), channel_id (uuid), shop_id (text), api_key (text)
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { ChannelService } from "./channel";
-import { channelsLogger } from "./logger";
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { channelsLogger } from "../logger";
+import { db } from "../database";
 
 export interface TeamChannelConfig {
   team: string;           // team uuid
@@ -26,13 +20,13 @@ export interface TeamChannelConfig {
   refresh_token?: string; // refresh token
 }
 
-export const TeamChannelService = {
+export class TeamChannelRepository {
   /**
    * Get all team-channel configurations for a team
    */
   async getTeamChannels(teamId: string): Promise<TeamChannelConfig[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_channels')
         .select('*')
         .eq('team_id', teamId);
@@ -54,17 +48,17 @@ export const TeamChannelService = {
         last_sync: tc.last_sync ? new Date(tc.last_sync) : undefined
       }));
     } catch (error) {
-      channelsLogger.error('TeamChannelService.getTeamChannels error:', error);
+      channelsLogger.error('TeamChannelRepository.getTeamChannels error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Get specific team-channel configuration
    */
   async getTeamChannel(teamId: string, channelId: string): Promise<TeamChannelConfig | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_channels')
         .select('*')
         .eq('team_id', teamId)
@@ -94,29 +88,23 @@ export const TeamChannelService = {
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
     } catch (error) {
-      channelsLogger.error('TeamChannelService.getTeamChannel error:', error);
+      channelsLogger.error('TeamChannelRepository.getTeamChannel error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Create or update team-channel configuration
    */
   async setTeamChannel(config: TeamChannelConfig): Promise<TeamChannelConfig> {
     try {
-      // Verify channel type exists
-      const channelExists = await ChannelService.channelTypeExists(config.channel_id);
-      if (!channelExists) {
-        throw new Error(`Channel type '${config.channel_id}' does not exist`);
-      }
-
       // Check if team-channel relationship already exists
       const existing = await this.getTeamChannel(config.team, config.channel_id);
 
       let result;
       if (existing) {
         // Update existing
-        const { data, error } = await supabase
+        const { data, error } = await db.getClient()
           .from('team_channels')
           .update({
             shop_id: config.shop_id,
@@ -139,7 +127,7 @@ export const TeamChannelService = {
         result = data;
       } else {
         // Create new
-        const { data, error } = await supabase
+        const { data, error } = await db.getClient()
           .from('team_channels')
           .insert({
             team_id: config.team,
@@ -173,17 +161,17 @@ export const TeamChannelService = {
         last_sync: result.last_sync ? new Date(result.last_sync) : undefined
       };
     } catch (error) {
-      channelsLogger.error('TeamChannelService.setTeamChannel error:', error);
+      channelsLogger.error('TeamChannelRepository.setTeamChannel error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Remove team-channel configuration
    */
   async removeTeamChannel(teamId: string, channelId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await db.getClient()
         .from('team_channels')
         .delete()
         .eq('team_id', teamId)
@@ -196,10 +184,10 @@ export const TeamChannelService = {
 
       return true;
     } catch (error) {
-      channelsLogger.error('TeamChannelService.removeTeamChannel error:', error);
+      channelsLogger.error('TeamChannelRepository.removeTeamChannel error:', error);
       return false;
     }
-  },
+  }
 
   /**
    * Update team-channel credentials
@@ -210,7 +198,7 @@ export const TeamChannelService = {
     credentials: { shop_id?: string; api_key?: string; api_secret?: string; token?: string; refresh_token?: string }
   ): Promise<TeamChannelConfig | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_channels')
         .update({
           shop_id: credentials.shop_id,
@@ -248,10 +236,10 @@ export const TeamChannelService = {
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
     } catch (error) {
-      channelsLogger.error('TeamChannelService.updateTeamChannelCredentials error:', error);
+      channelsLogger.error('TeamChannelRepository.updateTeamChannelCredentials error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Update team-channel connection status
@@ -263,7 +251,7 @@ export const TeamChannelService = {
     lastSync?: Date
   ): Promise<TeamChannelConfig | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_channels')
         .update({
           connected,
@@ -298,8 +286,72 @@ export const TeamChannelService = {
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
     } catch (error) {
-      channelsLogger.error('TeamChannelService.updateTeamChannelStatus error:', error);
+      channelsLogger.error('TeamChannelRepository.updateTeamChannelStatus error:', error);
       throw error;
     }
   }
-};
+
+  /**
+   * Check if team is connected to channel
+   */
+  async isTeamConnectedToChannel(teamId: string, channelId: string): Promise<boolean> {
+    try {
+      const config = await this.getTeamChannel(teamId, channelId);
+      return config?.connected || false;
+    } catch (error) {
+      channelsLogger.error('TeamChannelRepository.isTeamConnectedToChannel error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get teams connected to a specific channel
+   */
+  async getTeamsConnectedToChannel(channelId: string): Promise<TeamChannelConfig[]> {
+    try {
+      const { data, error } = await db.getClient()
+        .from('team_channels')
+        .select('*')
+        .eq('channel_id', channelId)
+        .eq('connected', true);
+
+      if (error) {
+        channelsLogger.error('Error fetching teams connected to channel:', error);
+        throw new Error(`Failed to fetch teams connected to channel: ${error.message}`);
+      }
+
+      return (data || []).map((tc: any) => ({
+        team: tc.team_id,
+        channel_id: tc.channel_id,
+        shop_id: tc.shop_id || undefined,
+        api_key: tc.api_key || undefined,
+        api_secret: tc.api_secret || undefined,
+        token: tc.token || undefined,
+        refresh_token: tc.refresh_token || undefined,
+        connected: tc.connected || false,
+        last_sync: tc.last_sync ? new Date(tc.last_sync) : undefined
+      }));
+    } catch (error) {
+      channelsLogger.error('TeamChannelRepository.getTeamsConnectedToChannel error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk update last sync time for multiple teams/channels
+   */
+  async bulkUpdateLastSync(teamChannels: Array<{teamId: string, channelId: string}>, lastSync: Date): Promise<boolean> {
+    try {
+      for (const tc of teamChannels) {
+        await this.updateTeamChannelStatus(tc.teamId, tc.channelId, true, lastSync);
+      }
+      return true;
+    } catch (error) {
+      channelsLogger.error('TeamChannelRepository.bulkUpdateLastSync error:', error);
+      return false;
+    }
+  }
+}
+
+// Legacy compatibility export
+export const TeamChannelService = new TeamChannelRepository();
