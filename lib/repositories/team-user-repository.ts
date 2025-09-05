@@ -1,15 +1,10 @@
 /**
- * Team-User Service
+ * Team-User Repository
  * Manages relationships between teams and users using Supabase
  */
 
-import { createClient } from '@supabase/supabase-js';
-import { teamLogger } from './logger';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { teamLogger } from '../logger';
+import { db } from '../database';
 
 export interface TeamUser {
   id: string;
@@ -22,19 +17,18 @@ export interface TeamUser {
   updated_at: Date;
 }
 
-export const TeamUserService = {
+export class TeamUserRepository {
   /**
    * Get team ID for a user (assuming user belongs to one team)
    */
   async getTeamIdByUserId(userId: string): Promise<string | null> {
     try {
       teamLogger.debug('user id', userId);
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_users')
         .select('team_id')
         .eq('user_id', userId)
         .single();
-
 
       if (error) {
         if (error.code === 'PGRST116') {
@@ -47,17 +41,17 @@ export const TeamUserService = {
 
       return data?.team_id || null;
     } catch (error) {
-      teamLogger.error('TeamUserService.getTeamIdByUserId error:', error);
+      teamLogger.error('TeamUserRepository.getTeamIdByUserId error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Get all teams for a user
    */
   async getTeamsByUserId(userId: string): Promise<TeamUser[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_users')
         .select('*')
         .eq('user_id', userId);
@@ -78,17 +72,17 @@ export const TeamUserService = {
         updated_at: new Date(tu.updated_at)
       }));
     } catch (error) {
-      teamLogger.error('TeamUserService.getTeamsByUserId error:', error);
+      teamLogger.error('TeamUserRepository.getTeamsByUserId error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Get all users in a team
    */
   async getUsersByTeamId(teamId: string): Promise<TeamUser[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_users')
         .select('*')
         .eq('team_id', teamId);
@@ -109,17 +103,17 @@ export const TeamUserService = {
         updated_at: new Date(tu.updated_at)
       }));
     } catch (error) {
-      teamLogger.error('TeamUserService.getUsersByTeamId error:', error);
+      teamLogger.error('TeamUserRepository.getUsersByTeamId error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Add user to team
    */
   async addUserToTeam(teamId: string, userId: string, role: string = 'member', invitedBy?: string): Promise<TeamUser> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_users')
         .insert({
           team_id: teamId,
@@ -146,17 +140,17 @@ export const TeamUserService = {
         updated_at: new Date(data.updated_at)
       };
     } catch (error) {
-      teamLogger.error('TeamUserService.addUserToTeam error:', error);
+      teamLogger.error('TeamUserRepository.addUserToTeam error:', error);
       throw error;
     }
-  },
+  }
 
   /**
    * Remove user from team
    */
   async removeUserFromTeam(teamId: string, userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await db.getClient()
         .from('team_users')
         .delete()
         .eq('team_id', teamId)
@@ -169,17 +163,17 @@ export const TeamUserService = {
 
       return true;
     } catch (error) {
-      teamLogger.error('TeamUserService.removeUserFromTeam error:', error);
+      teamLogger.error('TeamUserRepository.removeUserFromTeam error:', error);
       return false;
     }
-  },
+  }
 
   /**
    * Update user role in team
    */
   async updateUserRole(teamId: string, userId: string, role: string): Promise<TeamUser | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await db.getClient()
         .from('team_users')
         .update({ 
           role: role,
@@ -209,8 +203,65 @@ export const TeamUserService = {
         updated_at: new Date(data.updated_at)
       };
     } catch (error) {
-      teamLogger.error('TeamUserService.updateUserRole error:', error);
+      teamLogger.error('TeamUserRepository.updateUserRole error:', error);
       throw error;
     }
   }
-};
+
+  /**
+   * Check if user exists in team
+   */
+  async isUserInTeam(teamId: string, userId: string): Promise<boolean> {
+    try {
+      const { data, error } = await db.getClient()
+        .from('team_users')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return false;
+        }
+        teamLogger.error('Error checking user in team:', error);
+        throw new Error(`Failed to check user in team: ${error.message}`);
+      }
+
+      return !!data;
+    } catch (error) {
+      teamLogger.error('TeamUserRepository.isUserInTeam error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get user role in team
+   */
+  async getUserRoleInTeam(teamId: string, userId: string): Promise<string | null> {
+    try {
+      const { data, error } = await db.getClient()
+        .from('team_users')
+        .select('role')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        teamLogger.error('Error fetching user role in team:', error);
+        throw new Error(`Failed to fetch user role in team: ${error.message}`);
+      }
+
+      return data?.role || null;
+    } catch (error) {
+      teamLogger.error('TeamUserRepository.getUserRoleInTeam error:', error);
+      return null;
+    }
+  }
+}
+
+// Legacy compatibility export
+export const TeamUserService = new TeamUserRepository();
