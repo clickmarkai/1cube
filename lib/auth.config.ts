@@ -45,6 +45,7 @@ export const authOptions: NextAuthOptions = {
           
           // Check if password_hash exists
           if (!user.password_hash) {
+            // Keep error for visibility
             console.error("No password hash found for user:", user.email);
             return null;
           }
@@ -90,10 +91,13 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.name = token.name as string;
       }
-      console.log('👤 Final Session:', session);
+      // Avoid logging full session in production
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('👤 Final Session:', session);
+      }
       return session;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true, // Enable debug mode to see what's happening
+  debug: process.env.NODE_ENV !== 'production',
 };

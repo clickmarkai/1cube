@@ -7,6 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { ChannelService } from "./channel";
+import { channelsLogger } from "./logger";
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -37,7 +38,7 @@ export const TeamChannelService = {
         .eq('team_id', teamId);
 
       if (error) {
-        console.error('Error fetching team channels:', error);
+        channelsLogger.error('Error fetching team channels:', error);
         throw new Error(`Failed to fetch team channels: ${error.message}`);
       }
 
@@ -53,7 +54,7 @@ export const TeamChannelService = {
         last_sync: tc.last_sync ? new Date(tc.last_sync) : undefined
       }));
     } catch (error) {
-      console.error('TeamChannelService.getTeamChannels error:', error);
+      channelsLogger.error('TeamChannelService.getTeamChannels error:', error);
       throw error;
     }
   },
@@ -75,7 +76,7 @@ export const TeamChannelService = {
           // No rows returned
           return null;
         }
-        console.error('Error fetching team channel:', error);
+        channelsLogger.error('Error fetching team channel:', error);
         throw new Error(`Failed to fetch team channel: ${error.message}`);
       }
 
@@ -93,7 +94,7 @@ export const TeamChannelService = {
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
     } catch (error) {
-      console.error('TeamChannelService.getTeamChannel error:', error);
+      channelsLogger.error('TeamChannelService.getTeamChannel error:', error);
       throw error;
     }
   },
@@ -172,7 +173,7 @@ export const TeamChannelService = {
         last_sync: result.last_sync ? new Date(result.last_sync) : undefined
       };
     } catch (error) {
-      console.error('TeamChannelService.setTeamChannel error:', error);
+      channelsLogger.error('TeamChannelService.setTeamChannel error:', error);
       throw error;
     }
   },
@@ -189,13 +190,13 @@ export const TeamChannelService = {
         .eq('channel_id', channelId);
 
       if (error) {
-        console.error('Error removing team channel:', error);
+        channelsLogger.error('Error removing team channel:', error);
         throw new Error(`Failed to remove team channel: ${error.message}`);
       }
 
       return true;
     } catch (error) {
-      console.error('TeamChannelService.removeTeamChannel error:', error);
+      channelsLogger.error('TeamChannelService.removeTeamChannel error:', error);
       return false;
     }
   },
@@ -229,7 +230,7 @@ export const TeamChannelService = {
           // No rows returned
           return null;
         }
-        console.error('Error updating team channel credentials:', error);
+        channelsLogger.error('Error updating team channel credentials:', error);
         throw new Error(`Failed to update team channel credentials: ${error.message}`);
       }
 
@@ -247,7 +248,7 @@ export const TeamChannelService = {
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
     } catch (error) {
-      console.error('TeamChannelService.updateTeamChannelCredentials error:', error);
+      channelsLogger.error('TeamChannelService.updateTeamChannelCredentials error:', error);
       throw error;
     }
   },
@@ -279,7 +280,7 @@ export const TeamChannelService = {
           // No rows returned
           return null;
         }
-        console.error('Error updating team channel status:', error);
+        channelsLogger.error('Error updating team channel status:', error);
         throw new Error(`Failed to update team channel status: ${error.message}`);
       }
 
@@ -297,7 +298,7 @@ export const TeamChannelService = {
         last_sync: data.last_sync ? new Date(data.last_sync) : undefined
       };
     } catch (error) {
-      console.error('TeamChannelService.updateTeamChannelStatus error:', error);
+      channelsLogger.error('TeamChannelService.updateTeamChannelStatus error:', error);
       throw error;
     }
   }

@@ -8,6 +8,7 @@ import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLink
 import { ChannelService } from "../channel";
 import { ChannelsService } from "../channels-service";
 import { TeamUserService } from "../team-user";
+import { channelsLogger } from "@/lib/logger";
 
 // Global type declarations for OAuth state storage
 declare global {
@@ -95,7 +96,7 @@ export class ShopeeChannel extends BaseChannel {
 
   // Additional Shopee-specific methods can be added here
   async sync(): Promise<void> {
-    console.log(`Syncing ${this.getName()} data...`);
+    channelsLogger.debug(`Syncing ${this.getName()} data...`);
     // TODO: Implement Shopee-specific sync logic
   }
 
@@ -110,7 +111,7 @@ export class ShopeeChannel extends BaseChannel {
     }
   ): Promise<any[]> {
     try {
-      console.log(`Fetching products from ${this.getName()}...`);
+      channelsLogger.debug(`Fetching products from ${this.getName()}...`);
       
       const pageSize = options?.pageSize || 100; // Default page size
       const itemStatus = options?.itemStatus || 'NORMAL';
@@ -180,17 +181,17 @@ export class ShopeeChannel extends BaseChannel {
         if (hasNextPage) {
           // Update offset for next page
           offset += pageSize;
-          console.log(`📦 Fetched ${products.length} products (page ${Math.floor(offset / pageSize)}), continuing...`);
+          channelsLogger.debug(`📦 Fetched ${products.length} products (page ${Math.floor(offset / pageSize)}), continuing...`);
         } else {
-          console.log(`📦 Fetched ${products.length} products (final page)`);
+          channelsLogger.debug(`📦 Fetched ${products.length} products (final page)`);
         }
       }
 
-      console.log(`✅ Successfully fetched ${allProducts.length} total products from Shopee shop ${shopId}`);
+      channelsLogger.info(`✅ Successfully fetched ${allProducts.length} total products from Shopee shop ${shopId}`);
       return allProducts;
       
     } catch (error) {
-      console.error('❌ Error fetching Shopee products:', error);
+      channelsLogger.error('❌ Error fetching Shopee products:', error);
       throw error;
     }
   }
@@ -205,7 +206,7 @@ export class ShopeeChannel extends BaseChannel {
     }
   ): Promise<any[]> {
     try {
-      console.log(`Fetching product details from ${this.getName()} for ${itemIds.length} items...`);
+      channelsLogger.debug(`Fetching product details from ${this.getName()} for ${itemIds.length} items...`);
       
       if (!itemIds || itemIds.length === 0) {
         throw new Error('At least one item_id is required');
@@ -266,7 +267,7 @@ export class ShopeeChannel extends BaseChannel {
         const productDetails = responseData.response?.item_list || [];
         allProductDetails.push(...productDetails);
 
-        console.log(`📦 Fetched details for ${productDetails.length} products (batch ${Math.floor(i / MAX_ITEMS_PER_REQUEST) + 1})`);
+        channelsLogger.debug(`📦 Fetched details for ${productDetails.length} products (batch ${Math.floor(i / MAX_ITEMS_PER_REQUEST) + 1})`);
         
         // Add small delay between batches to avoid rate limiting
         if (i + MAX_ITEMS_PER_REQUEST < itemIds.length) {
@@ -274,17 +275,17 @@ export class ShopeeChannel extends BaseChannel {
         }
       }
 
-      console.log(`✅ Successfully fetched details for ${allProductDetails.length} total products from Shopee shop ${shopId}`);
+      channelsLogger.info(`✅ Successfully fetched details for ${allProductDetails.length} total products from Shopee shop ${shopId}`);
       return allProductDetails;
       
     } catch (error) {
-      console.error('❌ Error fetching Shopee product details:', error);
+      channelsLogger.error('❌ Error fetching Shopee product details:', error);
       throw error;
     }
   }
 
   async getOrders(): Promise<any[]> {
-    console.log(`Fetching orders from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching orders from ${this.getName()}...`);
     // TODO: Implement Shopee-specific order fetching
     return [];
   }
@@ -292,7 +293,7 @@ export class ShopeeChannel extends BaseChannel {
   // Database-based session state storage  
   private async storeSessionState(state: string, userId: string, channelName: string): Promise<void> {
     try {
-      console.log(`📦 Storing Shopee session state in DB - State: ${state}, UserId: ${userId}, Channel: ${channelName}`);
+      channelsLogger.debug(`📦 Storing Shopee session state in DB - State: ${state}, UserId: ${userId}, Channel: ${channelName}`);
       
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -321,16 +322,16 @@ export class ShopeeChannel extends BaseChannel {
       // Clean up expired states in database
       await this.cleanupExpiredStates();
       
-      console.log(`✅ Stored OAuth state for ${channelName} channel, user ${userId} in database`);
+      channelsLogger.info(`✅ Stored OAuth state for ${channelName} channel, user ${userId} in database`);
     } catch (error) {
-      console.error('❌ Error storing session state in database:', error);
+      channelsLogger.error('❌ Error storing session state in database:', error);
       throw error; // Re-throw to prevent auth link generation if storage fails
     }
   }
 
   private async verifySessionState(state: string): Promise<{ valid: boolean; error?: string; userId?: string }> {
     try {
-      console.log(`🔍 Verifying Shopee session state from database: ${state}`);
+      channelsLogger.debug(`🔍 Verifying Shopee session state from database: ${state}`);
       
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -346,14 +347,14 @@ export class ShopeeChannel extends BaseChannel {
       });
 
       if (!response.ok) {
-        console.error('❌ Database query failed:', response.status);
+        channelsLogger.error('❌ Database query failed:', response.status);
         return { valid: false, error: 'Database verification failed' };
       }
 
       const states = await response.json();
       
       if (states.length === 0) {
-        console.log('❌ OAuth state not found in database');
+        channelsLogger.warn('❌ OAuth state not found in database');
         return { valid: false, error: 'OAuth state not found - session may have expired' };
       }
 
@@ -361,7 +362,7 @@ export class ShopeeChannel extends BaseChannel {
 
       // Check if state has expired
       if (new Date(storedState.expires_at) < new Date()) {
-        console.log('❌ OAuth state expired');
+        channelsLogger.warn('❌ OAuth state expired');
         // Clean up expired state
         await this.deleteExpiredState(state);
         return { valid: false, error: 'OAuth state expired - please try again' };
@@ -369,18 +370,18 @@ export class ShopeeChannel extends BaseChannel {
 
       // Verify channel matches
       if (storedState.channel_name !== 'shopee') {
-        console.log('❌ OAuth state channel mismatch');
+        channelsLogger.warn('❌ OAuth state channel mismatch');
         return { valid: false, error: 'OAuth state channel mismatch' };
       }
 
-      console.log(`✅ Verified OAuth state for shopee channel, user ${storedState.user_id}`);
+      channelsLogger.info(`✅ Verified OAuth state for shopee channel, user ${storedState.user_id}`);
       
       // State is valid - remove it to prevent reuse
       await this.deleteExpiredState(state);
       
       return { valid: true, userId: storedState.user_id };
     } catch (error) {
-      console.error('❌ Error verifying session state:', error);
+      channelsLogger.error('❌ Error verifying session state:', error);
       return { valid: false, error: 'Error verifying OAuth state' };
     }
   }
@@ -399,9 +400,9 @@ export class ShopeeChannel extends BaseChannel {
         }
       });
       
-      console.log(`🗑️ Deleted expired state from database: ${state}`);
+      channelsLogger.info(`🗑️ Deleted expired state from database: ${state}`);
     } catch (error) {
-      console.error('❌ Error deleting expired state:', error);
+      channelsLogger.error('❌ Error deleting expired state:', error);
     }
   }
 
@@ -420,9 +421,9 @@ export class ShopeeChannel extends BaseChannel {
         }
       });
       
-      console.log(`🧹 Cleaned up expired OAuth states from database`);
+      channelsLogger.info(`🧹 Cleaned up expired OAuth states from database`);
     } catch (error) {
-      console.error('❌ Error cleaning up expired states:', error);
+      channelsLogger.error('❌ Error cleaning up expired states:', error);
     }
   }
 
@@ -470,7 +471,7 @@ export class ShopeeChannel extends BaseChannel {
 
       const tokenData = await response.json();
       
-      console.log(`✅ Successfully retrieved Shopee token for shop ${shopId}`);
+      channelsLogger.info(`✅ Successfully retrieved Shopee token for shop ${shopId}`);
       
       // Return both access token and refresh token
       return {
@@ -478,7 +479,7 @@ export class ShopeeChannel extends BaseChannel {
         refresh_token: tokenData.refresh_token
       };
     } catch (error) {
-      console.error('❌ Error getting Shopee token:', error);
+      channelsLogger.error('❌ Error getting Shopee token:', error);
       throw error;
     }
   }
@@ -524,7 +525,7 @@ export class ShopeeChannel extends BaseChannel {
 
       const tokenData = await response.json();
       
-      console.log(`✅ Successfully refreshed Shopee token for shop ${shopId}`);
+      channelsLogger.info(`✅ Successfully refreshed Shopee token for shop ${shopId}`);
       
       // Return both new access token and refresh token
       return {
@@ -532,7 +533,7 @@ export class ShopeeChannel extends BaseChannel {
         refresh_token: tokenData.refresh_token
       };
     } catch (error) {
-      console.error('❌ Error refreshing Shopee token:', error);
+      channelsLogger.error('❌ Error refreshing Shopee token:', error);
       throw error;
     }
   }
@@ -554,10 +555,10 @@ export class ShopeeChannel extends BaseChannel {
         teamId = userTeamId || DEFAULT_TEAM_ID;
         
         if (!userTeamId) {
-          console.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
+          channelsLogger.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
         }
       } catch (error) {
-        console.error(`Error getting team for user ${userId}:`, error);
+        channelsLogger.error(`Error getting team for user ${userId}:`, error);
         teamId = DEFAULT_TEAM_ID;
       }
 
@@ -566,7 +567,7 @@ export class ShopeeChannel extends BaseChannel {
       tokenMap.set('shop_id', credentials.shop_id || '');
       tokenMap.set('code', credentials.api_key || ''); // Shopee uses code as api_key
       
-      console.log(`🔑 Calling Shopee getToken API for shop ${credentials.shop_id}`);
+      channelsLogger.debug(`🔑 Calling Shopee getToken API for shop ${credentials.shop_id}`);
       const tokens = await this.getToken(tokenMap);
       
       // Update credentials with the retrieved tokens
@@ -583,9 +584,9 @@ export class ShopeeChannel extends BaseChannel {
         updatedCredentials
       );
 
-      console.log(`Successfully connected ${this.channelName} for user ${userId} in team ${teamId} with tokens`);
+      channelsLogger.info(`Successfully connected ${this.channelName} for user ${userId} in team ${teamId} with tokens`);
     } catch (error) {
-      console.error(`❌ Error in Shopee connectToDatabase:`, error);
+      channelsLogger.error(`❌ Error in Shopee connectToDatabase:`, error);
       throw error;
     }
   }

@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+import { navLogger } from '@/lib/logger';
 
 export function NavigationDebugger() {
   const pathname = usePathname();
@@ -14,9 +15,9 @@ export function NavigationDebugger() {
     if (previousPathnameRef.current && previousPathnameRef.current !== pathname) {
       // Route change detected
       const routeChangeTime = currentTime - (routeChangeStartRef.current || currentTime);
-      console.log(`🔄 Route changed from ${previousPathnameRef.current} to ${pathname} in ${routeChangeTime.toFixed(2)}ms`);
+      navLogger.debug(`🔄 Route changed from ${previousPathnameRef.current} to ${pathname} in ${routeChangeTime.toFixed(2)}ms`);
     } else {
-      console.log(`📍 Initial route load: ${pathname}`);
+      navLogger.debug(`📍 Initial route load: ${pathname}`);
     }
     
     // Set up for next route change
@@ -26,7 +27,7 @@ export function NavigationDebugger() {
     // Log when this component is fully rendered
     requestAnimationFrame(() => {
       const renderTime = performance.now() - currentTime;
-      console.log(`🎨 NavigationDebugger rendered for ${pathname} in ${renderTime.toFixed(2)}ms`);
+      navLogger.debug(`🎨 NavigationDebugger rendered for ${pathname} in ${renderTime.toFixed(2)}ms`);
     });
 
   }, [pathname]);

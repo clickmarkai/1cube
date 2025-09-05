@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth.config";
 import { ChannelsService } from "./channels-service";
+import { channelsLogger } from "./logger";
 import { ChannelService } from "./channel";
 import { TeamUserService } from "./team-user";
 
@@ -159,10 +160,10 @@ export abstract class BaseChannel {
       teamId = userTeamId || DEFAULT_TEAM_ID; // Fallback to default team if user not in any team
       
       if (!userTeamId) {
-        console.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
+        channelsLogger.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
       }
     } catch (error) {
-      console.error(`Error getting team for user ${userId}:`, error);
+      channelsLogger.error(`Error getting team for user ${userId}:`, error);
       teamId = DEFAULT_TEAM_ID; // Fallback to default team
     }
 
@@ -173,7 +174,7 @@ export abstract class BaseChannel {
       credentials
     );
 
-    console.log(`Successfully connected ${this.channelName} for user ${userId} in team ${teamId}`);
+    channelsLogger.info(`Successfully connected ${this.channelName} for user ${userId} in team ${teamId}`);
   }
 
   protected createSuccessRedirect(request: NextRequest): NextResponse {

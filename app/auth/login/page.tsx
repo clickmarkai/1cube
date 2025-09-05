@@ -136,9 +136,13 @@ function LoginForm() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log("Login password toggle clicked, current state:", showPassword);
+                    if (process.env.NODE_ENV !== 'production') {
+                      console.log("Login password toggle clicked, current state:", showPassword);
+                    }
                     setShowPassword(prev => {
-                      console.log("Changing login password visibility from", prev, "to", !prev);
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.log("Changing login password visibility from", prev, "to", !prev);
+                      }
                       return !prev;
                     });
                   }}
@@ -169,6 +173,10 @@ function LoginForm() {
             <Link href="/auth/register" className="font-medium text-primary hover:underline">
               Sign up for free
             </Link>
+          </p>
+
+          <p className="mt-4 text-center text-sm text-gray-400">
+            v0.0.1
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { channelsLogger } from './logger';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -30,7 +31,7 @@ export const ChannelService = {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Error fetching channels:', error);
+        channelsLogger.error('Error fetching channels:', error);
         throw new Error(`Failed to fetch channels: ${error.message}`);
       }
 
@@ -41,7 +42,7 @@ export const ChannelService = {
         created_at: new Date(channel.created_at)
       }));
     } catch (error) {
-      console.error('ChannelService.getAllChannelTypes error:', error);
+      channelsLogger.error('ChannelService.getAllChannelTypes error:', error);
       throw error;
     }
   },
@@ -62,7 +63,7 @@ export const ChannelService = {
           // No rows returned
           return null;
         }
-        console.error('Error fetching channel by ID:', error);
+        channelsLogger.error('Error fetching channel by ID:', error);
         throw new Error(`Failed to fetch channel: ${error.message}`);
       }
 
@@ -75,7 +76,7 @@ export const ChannelService = {
         created_at: new Date(data.created_at)
       };
     } catch (error) {
-      console.error('ChannelService.getChannelTypeById error:', error);
+      channelsLogger.error('ChannelService.getChannelTypeById error:', error);
       throw error;
     }
   },
@@ -96,7 +97,7 @@ export const ChannelService = {
           // No rows returned
           return null;
         }
-        console.error('Error fetching channel by name:', error);
+        channelsLogger.error('Error fetching channel by name:', error);
         throw new Error(`Failed to fetch channel: ${error.message}`);
       }
 
@@ -109,7 +110,7 @@ export const ChannelService = {
         created_at: new Date(data.created_at)
       };
     } catch (error) {
-      console.error('ChannelService.getChannelTypeByName error:', error);
+      channelsLogger.error('ChannelService.getChannelTypeByName error:', error);
       throw error;
     }
   },
@@ -122,7 +123,7 @@ export const ChannelService = {
       const channel = await this.getChannelTypeById(id);
       return channel !== null;
     } catch (error) {
-      console.error('ChannelService.channelTypeExists error:', error);
+      channelsLogger.error('ChannelService.channelTypeExists error:', error);
       return false;
     }
   },
@@ -142,7 +143,7 @@ export const ChannelService = {
         .single();
 
       if (error) {
-        console.error('Error creating channel:', error);
+        channelsLogger.error('Error creating channel:', error);
         throw new Error(`Failed to create channel: ${error.message}`);
       }
 
@@ -153,7 +154,7 @@ export const ChannelService = {
         created_at: new Date(data.created_at)
       };
     } catch (error) {
-      console.error('ChannelService.createChannelType error:', error);
+      channelsLogger.error('ChannelService.createChannelType error:', error);
       throw error;
     }
   },
@@ -171,7 +172,7 @@ export const ChannelService = {
         .single();
 
       if (error) {
-        console.error('Error updating channel:', error);
+        channelsLogger.error('Error updating channel:', error);
         throw new Error(`Failed to update channel: ${error.message}`);
       }
 
@@ -184,7 +185,7 @@ export const ChannelService = {
         created_at: new Date(data.created_at)
       };
     } catch (error) {
-      console.error('ChannelService.updateChannelType error:', error);
+      channelsLogger.error('ChannelService.updateChannelType error:', error);
       throw error;
     }
   },
@@ -200,13 +201,13 @@ export const ChannelService = {
         .eq('id', id);
 
       if (error) {
-        console.error('Error deleting channel:', error);
+        channelsLogger.error('Error deleting channel:', error);
         throw new Error(`Failed to delete channel: ${error.message}`);
       }
 
       return true;
     } catch (error) {
-      console.error('ChannelService.deleteChannelType error:', error);
+      channelsLogger.error('ChannelService.deleteChannelType error:', error);
       return false;
     }
   }

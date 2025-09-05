@@ -130,9 +130,13 @@ export default function RegisterPage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log("Password toggle clicked, current state:", showPassword);
+                    if (process.env.NODE_ENV !== 'production') {
+                      console.log("Password toggle clicked, current state:", showPassword);
+                    }
                     setShowPassword(prev => {
-                      console.log("Changing password visibility from", prev, "to", !prev);
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.log("Changing password visibility from", prev, "to", !prev);
+                      }
                       return !prev;
                     });
                   }}
@@ -169,9 +173,13 @@ export default function RegisterPage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log("Confirm password toggle clicked, current state:", showConfirmPassword);
+                    if (process.env.NODE_ENV !== 'production') {
+                      console.log("Confirm password toggle clicked, current state:", showConfirmPassword);
+                    }
                     setShowConfirmPassword(prev => {
-                      console.log("Changing confirm password visibility from", prev, "to", !prev);
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.log("Changing confirm password visibility from", prev, "to", !prev);
+                      }
                       return !prev;
                     });
                   }}

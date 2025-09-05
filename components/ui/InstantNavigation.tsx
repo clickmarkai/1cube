@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+import { navLogger } from '@/lib/logger';
 
 interface InstantNavProps {
   href: string;
@@ -16,28 +17,28 @@ export function InstantNav({ href, children, className, onClick }: InstantNavPro
 
   // Prefetch on mount and hover
   useEffect(() => {
-    console.log('🔄 Prefetching route on mount:', href);
+    navLogger.debug('🔄 Prefetching route on mount:', href);
     const start = performance.now();
     try {
       router.prefetch(href);
       const end = performance.now();
-      console.log(`✅ Prefetch completed for ${href} in ${end - start}ms`);
+      navLogger.debug(`✅ Prefetch completed for ${href} in ${end - start}ms`);
     } catch (err) {
-      console.error(`❌ Prefetch failed for ${href}:`, err);
+      navLogger.error(`❌ Prefetch failed for ${href}:`, err);
     }
   }, [href, router]);
 
   const handleMouseEnter = () => {
-    console.log('🖱️ Mouse enter, prefetching:', href);
+    navLogger.debug('🖱️ Mouse enter, prefetching:', href);
     // Aggressive prefetching
     clearTimeout(timeoutRef.current);
     const start = performance.now();
     try {
       router.prefetch(href);
       const end = performance.now();
-      console.log(`✅ Hover prefetch completed for ${href} in ${end - start}ms`);
+      navLogger.debug(`✅ Hover prefetch completed for ${href} in ${end - start}ms`);
     } catch (err) {
-      console.error(`❌ Hover prefetch failed for ${href}:`, err);
+      navLogger.error(`❌ Hover prefetch failed for ${href}:`, err);
     }
   };
 
@@ -45,13 +46,13 @@ export function InstantNav({ href, children, className, onClick }: InstantNavPro
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🔗 Navigation clicked:', href);
+    navLogger.debug('🔗 Navigation clicked:', href);
     const navigationStart = performance.now();
     
     // Immediate visual feedback
     if (onClick) onClick();
     
-    console.log('🚀 Starting router.push for:', href);
+    navLogger.debug('🚀 Starting router.push for:', href);
     
     // Instant navigation without transition delay
     router.push(href);
@@ -59,7 +60,7 @@ export function InstantNav({ href, children, className, onClick }: InstantNavPro
     // Log the time it takes
     requestAnimationFrame(() => {
       const navigationEnd = performance.now();
-      console.log(`📊 Navigation to ${href} initiated in ${navigationEnd - navigationStart}ms`);
+      navLogger.debug(`📊 Navigation to ${href} initiated in ${navigationEnd - navigationStart}ms`);
     });
   };
 

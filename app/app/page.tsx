@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { appLogger } from "@/lib/logger";
 import {
   TrendingUp,
   TrendingDown,
@@ -73,10 +74,10 @@ function formatCurrency(value: number): string {
 export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = React.useState("7d");
   
-  console.log('📊 Dashboard page component rendering...');
+  appLogger.debug('📊 Dashboard page component rendering...');
   
   React.useEffect(() => {
-    console.log('📊 Dashboard page mounted and ready');
+    appLogger.debug('📊 Dashboard page mounted and ready');
   }, []);
 
   return (

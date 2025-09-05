@@ -5,6 +5,7 @@
 
 import crypto from 'crypto';
 import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
+import { channelsLogger } from "@/lib/logger";
 
 // Global type declarations for OAuth state storage
 declare global {
@@ -79,98 +80,98 @@ export class TikTokShopChannel extends BaseChannel {
   // TikTok Shop-specific methods
   async sync(): Promise<void> {
     // TODO: Implement TikTok Shop-specific sync logic
-    console.log(`Syncing ${this.getName()} data...`);
+    channelsLogger.debug(`Syncing ${this.getName()} data...`);
   }
 
   async getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]> {
     // TODO: Implement TikTok Shop-specific product fetching
-    console.log(`Fetching products from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching products from ${this.getName()}...`);
     return [];
   }
 
   async getOrders(): Promise<any[]> {
     // TODO: Implement TikTok Shop-specific order fetching
-    console.log(`Fetching orders from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching orders from ${this.getName()}...`);
     return [];
   }
 
   // Additional TikTok Shop-specific methods
   async getShopInfo(): Promise<any> {
     // TODO: Implement TikTok Shop info fetching
-    console.log(`Fetching shop info from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching shop info from ${this.getName()}...`);
     return {};
   }
 
   async getCategories(): Promise<any[]> {
     // TODO: Implement TikTok Shop categories fetching
-    console.log(`Fetching categories from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching categories from ${this.getName()}...`);
     return [];
   }
 
   async createProduct(productData: any): Promise<any> {
     // TODO: Implement TikTok Shop product creation
-    console.log(`Creating product on ${this.getName()}...`);
+    channelsLogger.debug(`Creating product on ${this.getName()}...`);
     return null;
   }
 
   async updateProduct(productId: string, productData: any): Promise<any> {
     // TODO: Implement TikTok Shop product update
-    console.log(`Updating product ${productId} on ${this.getName()}...`);
+    channelsLogger.debug(`Updating product ${productId} on ${this.getName()}...`);
     return null;
   }
 
   async getInventory(): Promise<any[]> {
     // TODO: Implement TikTok Shop inventory fetching
-    console.log(`Fetching inventory from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching inventory from ${this.getName()}...`);
     return [];
   }
 
   async updateInventory(inventoryData: any): Promise<any> {
     // TODO: Implement TikTok Shop inventory update
-    console.log(`Updating inventory on ${this.getName()}...`);
+    channelsLogger.debug(`Updating inventory on ${this.getName()}...`);
     return null;
   }
 
   async getPromotions(): Promise<any[]> {
     // TODO: Implement TikTok Shop promotions fetching
-    console.log(`Fetching promotions from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching promotions from ${this.getName()}...`);
     return [];
   }
 
   async createPromotion(promotionData: any): Promise<any> {
     // TODO: Implement TikTok Shop promotion creation
-    console.log(`Creating promotion on ${this.getName()}...`);
+    channelsLogger.debug(`Creating promotion on ${this.getName()}...`);
     return null;
   }
 
   async getAnalytics(): Promise<any> {
     // TODO: Implement TikTok Shop analytics fetching
-    console.log(`Fetching analytics from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching analytics from ${this.getName()}...`);
     return {};
   }
 
   async getCustomers(): Promise<any[]> {
     // TODO: Implement TikTok Shop customers fetching
-    console.log(`Fetching customers from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching customers from ${this.getName()}...`);
     return [];
   }
 
   async getShipping(): Promise<any[]> {
     // TODO: Implement TikTok Shop shipping info fetching
-    console.log(`Fetching shipping info from ${this.getName()}...`);
+    channelsLogger.debug(`Fetching shipping info from ${this.getName()}...`);
     return [];
   }
 
   async updateShipping(shippingData: any): Promise<any> {
     // TODO: Implement TikTok Shop shipping update
-    console.log(`Updating shipping on ${this.getName()}...`);
+    channelsLogger.debug(`Updating shipping on ${this.getName()}...`);
     return null;
   }
 
   // Database-based session state storage methods
   private async storeSessionState(state: string, userId: string, channelName: string): Promise<void> {
     try {
-      console.log(`📦 Storing TikTok Shop session state in DB - State: ${state}, UserId: ${userId}, Channel: ${channelName}`);
+      channelsLogger.debug(`📦 Storing TikTok Shop session state in DB - State: ${state}, UserId: ${userId}, Channel: ${channelName}`);
       
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -199,16 +200,16 @@ export class TikTokShopChannel extends BaseChannel {
       // Clean up expired states in database
       await this.cleanupExpiredStates();
       
-      console.log(`✅ Stored OAuth state for ${channelName} channel, user ${userId} in database`);
+      channelsLogger.info(`✅ Stored OAuth state for ${channelName} channel, user ${userId} in database`);
     } catch (error) {
-      console.error('❌ Error storing session state in database:', error);
+      channelsLogger.error('❌ Error storing session state in database:', error);
       throw error; // Re-throw to prevent auth link generation if storage fails
     }
   }
 
   private async verifySessionState(state: string): Promise<{ valid: boolean; error?: string; userId?: string }> {
     try {
-      console.log(`🔍 Verifying TikTok Shop session state from database: ${state}`);
+      channelsLogger.debug(`🔍 Verifying TikTok Shop session state from database: ${state}`);
       
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -224,14 +225,14 @@ export class TikTokShopChannel extends BaseChannel {
       });
 
       if (!response.ok) {
-        console.error('❌ Database query failed:', response.status);
+        channelsLogger.error('❌ Database query failed:', response.status);
         return { valid: false, error: 'Database verification failed' };
       }
 
       const states = await response.json();
       
       if (states.length === 0) {
-        console.log('❌ OAuth state not found in database');
+        channelsLogger.warn('❌ OAuth state not found in database');
         return { valid: false, error: 'OAuth state not found - session may have expired' };
       }
 
@@ -239,7 +240,7 @@ export class TikTokShopChannel extends BaseChannel {
 
       // Check if state has expired
       if (new Date(storedState.expires_at) < new Date()) {
-        console.log('❌ OAuth state expired');
+        channelsLogger.warn('❌ OAuth state expired');
         // Clean up expired state
         await this.deleteExpiredState(state);
         return { valid: false, error: 'OAuth state expired - please try again' };
@@ -247,18 +248,18 @@ export class TikTokShopChannel extends BaseChannel {
 
       // Verify channel matches
       if (storedState.channel_name !== 'tiktok shop') {
-        console.log('❌ OAuth state channel mismatch');
+        channelsLogger.warn('❌ OAuth state channel mismatch');
         return { valid: false, error: 'OAuth state channel mismatch' };
       }
 
-      console.log(`✅ Verified OAuth state for tiktok-shop channel, user ${storedState.user_id}`);
+      channelsLogger.info(`✅ Verified OAuth state for tiktok-shop channel, user ${storedState.user_id}`);
       
       // State is valid - remove it to prevent reuse
       await this.deleteExpiredState(state);
       
       return { valid: true, userId: storedState.user_id };
     } catch (error) {
-      console.error('❌ Error verifying session state:', error);
+      channelsLogger.error('❌ Error verifying session state:', error);
       return { valid: false, error: 'Error verifying OAuth state' };
     }
   }
@@ -277,9 +278,9 @@ export class TikTokShopChannel extends BaseChannel {
         }
       });
       
-      console.log(`🗑️ Deleted expired state from database: ${state}`);
+      channelsLogger.info(`🗑️ Deleted expired state from database: ${state}`);
     } catch (error) {
-      console.error('❌ Error deleting expired state:', error);
+      channelsLogger.error('❌ Error deleting expired state:', error);
     }
   }
 
@@ -297,9 +298,9 @@ export class TikTokShopChannel extends BaseChannel {
         }
       });
       
-      console.log(`🧹 Cleaned up expired OAuth states from database`);
+      channelsLogger.info(`🧹 Cleaned up expired OAuth states from database`);
     } catch (error) {
-      console.error('❌ Error cleaning up expired states:', error);
+      channelsLogger.error('❌ Error cleaning up expired states:', error);
     }
   }
 
@@ -313,12 +314,12 @@ export class TikTokShopChannel extends BaseChannel {
 
   private async storeCodeVerifier(state: string, codeVerifier: string): Promise<void> {
     // TODO: Implement code verifier storage for TikTok Shop
-    console.log(`Storing code verifier for TikTok Shop state: ${state}`);
+    channelsLogger.debug(`Storing code verifier for TikTok Shop state: ${state}`);
   }
 
   private async getCodeVerifier(state: string): Promise<string | null> {
     // TODO: Implement code verifier retrieval for TikTok Shop
-    console.log(`Retrieving code verifier for TikTok Shop state: ${state}`);
+    channelsLogger.debug(`Retrieving code verifier for TikTok Shop state: ${state}`);
     return null;
   }
 

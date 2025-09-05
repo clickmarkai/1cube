@@ -42,10 +42,14 @@ const mockCampaigns = [
 export default function CampaignsPage() {
   const [campaigns] = useState(mockCampaigns);
   
-  console.log('🎯 Campaigns page component rendering...');
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('🎯 Campaigns page component rendering...');
+  }
   
   React.useEffect(() => {
-    console.log('🎯 Campaigns page mounted and ready');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🎯 Campaigns page mounted and ready');
+    }
   }, []);
 
   const getStatusColor = (status: string) => {

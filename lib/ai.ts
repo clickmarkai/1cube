@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { aiLogger } from './logger';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -90,7 +91,7 @@ class OpenAIProvider implements AIProvider {
 
       return completion.choices[0]?.message?.content || '';
     } catch (error) {
-      console.error('OpenAI API error:', error);
+      aiLogger.error('OpenAI API error:', error as Error);
       // Fallback to mock response
       return this.getMockContent(prompt, options);
     }

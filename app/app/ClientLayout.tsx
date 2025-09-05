@@ -8,6 +8,7 @@ import { usePrefetchRoutes } from "../../hooks/usePrefetchRoutes";
 import { PerformanceMonitor } from "../../components/PerformanceMonitor";
 import { NavigationDebugger } from "../../components/NavigationDebugger";
 import { RouterDebugger } from "../../components/RouterDebugger";
+import { appLogger } from "@/lib/logger";
 import {
   LayoutDashboard,
   Megaphone,
@@ -32,16 +33,16 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard },
-  { name: "Campaigns", href: "/app/campaigns", icon: Megaphone },
+  // { name: "Campaigns", href: "/app/campaigns", icon: Megaphone },
   { name: "Content", href: "/app/content", icon: FileText },
-  { name: "Intelligence", href: "/app/intelligence", icon: Brain },
-  { name: "Bundles", href: "/app/bundles", icon: Package },
-  { name: "Email", href: "/app/email", icon: Mail },
-  { name: "Chatbot", href: "/app/chatbot", icon: MessageCircle },
-  { name: "Inventory", href: "/app/inventory", icon: Box },
-  { name: "Listings", href: "/app/listings", icon: List },
-  { name: "Orders", href: "/app/orders", icon: ShoppingCart },
-  { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
+  // { name: "Intelligence", href: "/app/intelligence", icon: Brain },
+  // { name: "Bundles", href: "/app/bundles", icon: Package },
+  // { name: "Email", href: "/app/email", icon: Mail },
+  // { name: "Chatbot", href: "/app/chatbot", icon: MessageCircle },
+  // { name: "Inventory", href: "/app/inventory", icon: Box },
+  // { name: "Listings", href: "/app/listings", icon: List },
+  // { name: "Orders", href: "/app/orders", icon: ShoppingCart },
+  // { name: "Analytics", href: "/app/analytics", icon: BarChart3 },
   { name: "Creatives Lab", href: "/app/creatives-lab", icon: Palette },
   { name: "Settings", href: "/app/settings", icon: Settings },
 ];
@@ -52,9 +53,9 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { data: session, status } = useSession();
-  
-  console.log('🏗️ ClientLayout rendering for pathname:', pathname);
-  console.log('🔐 Session status:', status, 'Session:', session);
+ 
+  appLogger.debug('🏗️ ClientLayout rendering for pathname:', pathname);
+  appLogger.debug('🔐 Session status:', status, 'Session:', session);
   
   // Prefetch all routes for instant navigation
   usePrefetchRoutes();
@@ -95,9 +96,13 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PerformanceMonitor />
-      <NavigationDebugger />
-      <RouterDebugger />
+      {process.env.NODE_ENV !== 'production' && (
+        <>
+          <PerformanceMonitor />
+          <NavigationDebugger />
+          <RouterDebugger />
+        </>
+      )}
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div

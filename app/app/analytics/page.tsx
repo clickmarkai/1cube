@@ -11,6 +11,7 @@ import {
   Filter,
   Download,
 } from "lucide-react";
+import { appLogger } from "@/lib/logger";
 
 const kpiData = [
   { title: "Total Revenue", value: "Rp 2.8B", change: 12.5, trend: "up", icon: DollarSign },
@@ -30,10 +31,10 @@ const channelData = [
 export default function AnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("7d");
   
-  console.log('📈 Analytics page component rendering...');
+  appLogger.debug('📈 Analytics page component rendering...');
   
   React.useEffect(() => {
-    console.log('📈 Analytics page mounted and ready');
+    appLogger.debug('📈 Analytics page mounted and ready');
   }, []);
 
   return (

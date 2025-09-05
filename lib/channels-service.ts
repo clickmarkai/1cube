@@ -7,6 +7,7 @@ import { ChannelService, ChannelType } from "./channel";
 import { TeamChannelService, TeamChannelConfig } from "./team-channel";
 import { TeamUserService } from "./team-user";
 import { ChannelInfo } from "./channels";
+import { channelsLogger } from "./logger";
 
 export interface TeamInfo {
   id: string;
@@ -163,7 +164,7 @@ export async function getChannelsByUserId(userId: string): Promise<{
       const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
       teamId = userTeamId || DEFAULT_TEAM_ID;
     } catch (error) {
-      console.warn(`Could not get team for user ${userId}, using default team`);
+      channelsLogger.warn(`Could not get team for user ${userId}, using default team`);
       teamId = DEFAULT_TEAM_ID;
     }
 
@@ -203,7 +204,7 @@ export async function getChannelsByUserId(userId: string): Promise<{
       data: channels
     };
   } catch (error) {
-    console.error('getChannelsByUserId error:', error);
+    channelsLogger.error('getChannelsByUserId error:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -232,7 +233,7 @@ export async function updateChannelConnectionByName(
       const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
       teamId = userTeamId || DEFAULT_TEAM_ID;
     } catch (error) {
-      console.warn(`Could not get team for user ${userId}, using default team`);
+      channelsLogger.warn(`Could not get team for user ${userId}, using default team`);
       teamId = DEFAULT_TEAM_ID;
     }
 
@@ -267,7 +268,7 @@ export async function updateChannelConnectionByName(
       data: result
     };
   } catch (error) {
-    console.error('updateChannelConnectionByName error:', error);
+    channelsLogger.error('updateChannelConnectionByName error:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

@@ -8,7 +8,9 @@ export default function TestTogglePage() {
   const [password, setPassword] = useState("test123");
 
   const handleToggle = () => {
-    console.log("Toggle clicked! Current state:", showPassword);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("Toggle clicked! Current state:", showPassword);
+    }
     setShowPassword(!showPassword);
   };
 
@@ -71,7 +73,9 @@ export default function TestTogglePage() {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log("Complex toggle clicked!");
+              if (process.env.NODE_ENV !== 'production') {
+                console.log("Complex toggle clicked!");
+              }
               handleToggle();
             }}
             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none z-20 bg-yellow-200 p-1 rounded cursor-pointer"

@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { teamLogger } from './logger';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -27,7 +28,7 @@ export const TeamUserService = {
    */
   async getTeamIdByUserId(userId: string): Promise<string | null> {
     try {
-      console.log('user id', userId);
+      teamLogger.debug('user id', userId);
       const { data, error } = await supabase
         .from('team_users')
         .select('team_id')
@@ -40,13 +41,13 @@ export const TeamUserService = {
           // No rows returned - user not in any team
           return null;
         }
-        console.error('Error fetching team for user:', error);
+        teamLogger.error('Error fetching team for user:', error);
         throw new Error(`Failed to fetch team for user: ${error.message}`);
       }
 
       return data?.team_id || null;
     } catch (error) {
-      console.error('TeamUserService.getTeamIdByUserId error:', error);
+      teamLogger.error('TeamUserService.getTeamIdByUserId error:', error);
       throw error;
     }
   },
@@ -62,7 +63,7 @@ export const TeamUserService = {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('Error fetching teams for user:', error);
+        teamLogger.error('Error fetching teams for user:', error);
         throw new Error(`Failed to fetch teams for user: ${error.message}`);
       }
 
@@ -77,7 +78,7 @@ export const TeamUserService = {
         updated_at: new Date(tu.updated_at)
       }));
     } catch (error) {
-      console.error('TeamUserService.getTeamsByUserId error:', error);
+      teamLogger.error('TeamUserService.getTeamsByUserId error:', error);
       throw error;
     }
   },
@@ -93,7 +94,7 @@ export const TeamUserService = {
         .eq('team_id', teamId);
 
       if (error) {
-        console.error('Error fetching users for team:', error);
+        teamLogger.error('Error fetching users for team:', error);
         throw new Error(`Failed to fetch users for team: ${error.message}`);
       }
 
@@ -108,7 +109,7 @@ export const TeamUserService = {
         updated_at: new Date(tu.updated_at)
       }));
     } catch (error) {
-      console.error('TeamUserService.getUsersByTeamId error:', error);
+      teamLogger.error('TeamUserService.getUsersByTeamId error:', error);
       throw error;
     }
   },
@@ -130,7 +131,7 @@ export const TeamUserService = {
         .single();
 
       if (error) {
-        console.error('Error adding user to team:', error);
+        teamLogger.error('Error adding user to team:', error);
         throw new Error(`Failed to add user to team: ${error.message}`);
       }
 
@@ -145,7 +146,7 @@ export const TeamUserService = {
         updated_at: new Date(data.updated_at)
       };
     } catch (error) {
-      console.error('TeamUserService.addUserToTeam error:', error);
+      teamLogger.error('TeamUserService.addUserToTeam error:', error);
       throw error;
     }
   },
@@ -162,13 +163,13 @@ export const TeamUserService = {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('Error removing user from team:', error);
+        teamLogger.error('Error removing user from team:', error);
         throw new Error(`Failed to remove user from team: ${error.message}`);
       }
 
       return true;
     } catch (error) {
-      console.error('TeamUserService.removeUserFromTeam error:', error);
+      teamLogger.error('TeamUserService.removeUserFromTeam error:', error);
       return false;
     }
   },
@@ -193,7 +194,7 @@ export const TeamUserService = {
         if (error.code === 'PGRST116') {
           return null;
         }
-        console.error('Error updating user role:', error);
+        teamLogger.error('Error updating user role:', error);
         throw new Error(`Failed to update user role: ${error.message}`);
       }
 
@@ -208,7 +209,7 @@ export const TeamUserService = {
         updated_at: new Date(data.updated_at)
       };
     } catch (error) {
-      console.error('TeamUserService.updateUserRole error:', error);
+      teamLogger.error('TeamUserService.updateUserRole error:', error);
       throw error;
     }
   }
