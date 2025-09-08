@@ -26,7 +26,7 @@ export interface TikTokShopProductSearchOptions {
   updateTimeLe?: number;
   categoryVersion?: string;
   listingQualityTiers?: ('POOR' | 'FAIR' | 'GOOD' | 'EXCELLENT')[];
-  listingPlatforms?: ('TIKTOK_SHOP' | 'SHOPIFY')[];
+  listingPlatforms?: ('NEXT_PUBLIC_TIKTOK_SHOP' | 'SHOPIFY')[];
   auditStatus?: ('AUDITING' | 'APPROVED' | 'REJECTED')[];
   skuIds?: string[];
   returnDraftVersion?: boolean;
@@ -223,10 +223,6 @@ export class TikTokShopApiClient {
     );
   }
 
-  /**
-   * Get single product from TikTok Shop
-   * API: /product/202309/products/{product_id}
-   */
   async getProduct(
     productId: string,
     shopCipher: string,
@@ -254,10 +250,6 @@ export class TikTokShopApiClient {
     );
   }
 
-  /**
-   * Get access token using authorization code
-   * API: /authorization/202309/token/get
-   */
   async getToken(authCode: string): Promise<{access_token: string, refresh_token?: string}> {
     const tokenData = {
       app_key: this.config.appKey,
@@ -273,10 +265,6 @@ export class TikTokShopApiClient {
     );
   }
 
-  /**
-   * Refresh access token using refresh token
-   * API: /authorization/202309/token/refresh
-   */
   async refreshToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string}> {
     const tokenData = {
       app_key: this.config.appKey,
@@ -292,39 +280,4 @@ export class TikTokShopApiClient {
     );
   }
 
-  /**
-   * Get shop information
-   * API: /shop/202309/shops
-   */
-  async getShops(shopCipher: string, accessToken: string): Promise<any> {
-    const queryParams = {
-      shop_cipher: shopCipher
-    };
-
-    return await this.makeRequest(
-      '/shop/202309/shops',
-      'GET',
-      queryParams,
-      undefined,
-      { 'x-tts-access-token': accessToken }
-    );
-  }
-
-  /**
-   * Get categories
-   * API: /product/202309/categories
-   */
-  async getCategories(locale?: string): Promise<any[]> {
-    const queryParams: Record<string, any> = {};
-    
-    if (locale) {
-      queryParams.locale = locale;
-    }
-
-    return await this.makeRequest(
-      '/product/202309/categories',
-      'GET',
-      queryParams
-    );
-  }
 }

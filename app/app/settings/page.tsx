@@ -7,9 +7,9 @@ import {
   Store, Users, Globe, Bell, Shield, CreditCard, Key, 
   Check, X, Plus, Settings as SettingsIcon, Save, AlertCircle 
 } from "lucide-react";
-import { generateChannelAuthLink } from "@/lib/channels";
-import { getChannelsByUserId, updateChannelConnectionByName as updateChannelConnectionService } from "@/lib/channels-service";
-import { type Channel } from "@/lib/channels";
+import { ChannelFactory } from "@/lib/channels/factory/channels";
+import { getChannelsByUserId, updateChannelConnectionByName as updateChannelConnectionService } from "@/lib/services/channels-service";
+import { type ChannelInfo as Channel } from "@/lib/channels/factory/channels";
 
 type TabType = "channels" | "team" | "brand" | "billing" | "security";
 
@@ -137,7 +137,7 @@ function SettingsContent() {
       setMessage({ type: 'error', text: errorMessage });
     } else if (success && successMessage) {
       setMessage({ type: 'success', text: successMessage });
-      if (success === 'shopee_connected' || success === 'tiktok_connected') {
+      if (success === 'shopee_connected' || success === 'NEXT_PUBLIC_TIKTOK_connected') {
         fetchChannels();
       }
     }
@@ -210,9 +210,13 @@ function SettingsContent() {
                   onClick={async () => {  
                     if (channel.name === "Shopee") {
                       try {
-                        const { authLink, state } = await generateChannelAuthLink('shopee', {
+                        const result = await ChannelFactory.generateAuthLink('shopee', {
                           userId: session?.user?.id || ""
                         });
+                        if (!result) {
+                          throw new Error('Failed to generate Shopee auth link');
+                        }
+                        const { authLink, state } = result;
                         
                         // State is now stored server-side, no need for cookie
                         window.location.href = authLink;
@@ -222,9 +226,13 @@ function SettingsContent() {
                       }
                     } else if (channel.name === "TikTok") {
                       try {
-                        const { authLink, state } = await generateChannelAuthLink('tiktok', {
+                        const result = await ChannelFactory.generateAuthLink('tiktok', {
                           userId: session?.user?.id || ""
                         });
+                        if (!result) {
+                          throw new Error('Failed to generate TikTok auth link');
+                        }
+                        const { authLink, state } = result;
                         
                         // State is now stored server-side, no need for cookie
                         window.location.href = authLink;
@@ -234,9 +242,13 @@ function SettingsContent() {
                       }
                     } else {
                       try {
-                        const { authLink, state } = await generateChannelAuthLink(channel.name.toLowerCase(), {
+                        const result = await ChannelFactory.generateAuthLink(channel.name.toLowerCase(), {
                           userId: session?.user?.id || ""
                         });
+                        if (!result) {
+                          throw new Error(`Failed to generate ${channel.name} auth link`);
+                        }
+                        const { authLink, state } = result;
                         
                         // State is now stored server-side, no need for cookie
                         window.location.href = authLink;

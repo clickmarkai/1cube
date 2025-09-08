@@ -16,8 +16,13 @@ export interface TeamChannelConfig {
   api_secret?: string;    // api secret
   connected: boolean;     // connection status
   last_sync?: Date;       // last sync date
-  token?: string;         // token
+  token?: string;         // access token
   refresh_token?: string; // refresh token
+  code_verifier?: string; // PKCE code verifier for OAuth
+  token_expires_at?: Date;        // when access token expires
+  refresh_token_expires_at?: Date; // when refresh token expires
+  token_created_at?: Date;        // when token was created/refreshed
+  last_token_refresh?: Date;      // last successful token refresh
 }
 
 export class TeamChannelRepository {
@@ -44,8 +49,13 @@ export class TeamChannelRepository {
         api_secret: tc.api_secret || undefined,
         token: tc.token || undefined,
         refresh_token: tc.refresh_token || undefined,
+        code_verifier: tc.code_verifier || undefined,
         connected: tc.connected || false,
-        last_sync: tc.last_sync ? new Date(tc.last_sync) : undefined
+        last_sync: tc.last_sync ? new Date(tc.last_sync) : undefined,
+        token_expires_at: tc.token_expires_at ? new Date(tc.token_expires_at) : undefined,
+        refresh_token_expires_at: tc.refresh_token_expires_at ? new Date(tc.refresh_token_expires_at) : undefined,
+        token_created_at: tc.token_created_at ? new Date(tc.token_created_at) : undefined,
+        last_token_refresh: tc.last_token_refresh ? new Date(tc.last_token_refresh) : undefined
       }));
     } catch (error) {
       channelsLogger.error('TeamChannelRepository.getTeamChannels error:', error);
@@ -84,8 +94,13 @@ export class TeamChannelRepository {
         api_secret: data.api_secret || undefined,
         token: data.token || undefined,
         refresh_token: data.refresh_token || undefined,
+        code_verifier: data.code_verifier || undefined,
         connected: data.connected || false,
-        last_sync: data.last_sync ? new Date(data.last_sync) : undefined
+        last_sync: data.last_sync ? new Date(data.last_sync) : undefined,
+        token_expires_at: data.token_expires_at ? new Date(data.token_expires_at) : undefined,
+        refresh_token_expires_at: data.refresh_token_expires_at ? new Date(data.refresh_token_expires_at) : undefined,
+        token_created_at: data.token_created_at ? new Date(data.token_created_at) : undefined,
+        last_token_refresh: data.last_token_refresh ? new Date(data.last_token_refresh) : undefined
       };
     } catch (error) {
       channelsLogger.error('TeamChannelRepository.getTeamChannel error:', error);
@@ -112,6 +127,11 @@ export class TeamChannelRepository {
             api_secret: config.api_secret,
             token: config.token,
             refresh_token: config.refresh_token,
+            code_verifier: config.code_verifier,
+            token_expires_at: config.token_expires_at?.toISOString(),
+            refresh_token_expires_at: config.refresh_token_expires_at?.toISOString(),
+            token_created_at: config.token_created_at?.toISOString(),
+            last_token_refresh: config.last_token_refresh?.toISOString(),
             connected: config.connected,
             last_sync: config.last_sync?.toISOString(),
             updated_at: new Date().toISOString()
@@ -137,6 +157,11 @@ export class TeamChannelRepository {
             api_secret: config.api_secret,
             token: config.token,
             refresh_token: config.refresh_token,
+            code_verifier: config.code_verifier,
+            token_expires_at: config.token_expires_at?.toISOString(),
+            refresh_token_expires_at: config.refresh_token_expires_at?.toISOString(),
+            token_created_at: config.token_created_at?.toISOString(),
+            last_token_refresh: config.last_token_refresh?.toISOString(),
             connected: config.connected,
             last_sync: config.last_sync?.toISOString()
           })
@@ -157,6 +182,11 @@ export class TeamChannelRepository {
         api_secret: result.api_secret || undefined,
         token: result.token || undefined,
         refresh_token: result.refresh_token || undefined,
+        code_verifier: result.code_verifier || undefined,
+        token_expires_at: result.token_expires_at ? new Date(result.token_expires_at) : undefined,
+        refresh_token_expires_at: result.refresh_token_expires_at ? new Date(result.refresh_token_expires_at) : undefined,
+        token_created_at: result.token_created_at ? new Date(result.token_created_at) : undefined,
+        last_token_refresh: result.last_token_refresh ? new Date(result.last_token_refresh) : undefined,
         connected: result.connected || false,
         last_sync: result.last_sync ? new Date(result.last_sync) : undefined
       };
@@ -195,7 +225,17 @@ export class TeamChannelRepository {
   async updateTeamChannelCredentials(
     teamId: string, 
     channelId: string, 
-    credentials: { shop_id?: string; api_key?: string; api_secret?: string; token?: string; refresh_token?: string }
+    credentials: { 
+      shop_id?: string; 
+      api_key?: string; 
+      api_secret?: string; 
+      token?: string; 
+      refresh_token?: string;
+      token_expires_at?: Date;
+      refresh_token_expires_at?: Date;
+      token_created_at?: Date;
+      last_token_refresh?: Date;
+    }
   ): Promise<TeamChannelConfig | null> {
     try {
       const { data, error } = await db.getClient()
@@ -206,6 +246,10 @@ export class TeamChannelRepository {
           api_secret: credentials.api_secret,
           token: credentials.token,
           refresh_token: credentials.refresh_token,
+          token_expires_at: credentials.token_expires_at?.toISOString(),
+          refresh_token_expires_at: credentials.refresh_token_expires_at?.toISOString(),
+          token_created_at: credentials.token_created_at?.toISOString(),
+          last_token_refresh: credentials.last_token_refresh?.toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('team_id', teamId)
@@ -233,7 +277,11 @@ export class TeamChannelRepository {
         token: data.token || undefined,
         refresh_token: data.refresh_token || undefined,
         connected: data.connected || false,
-        last_sync: data.last_sync ? new Date(data.last_sync) : undefined
+        last_sync: data.last_sync ? new Date(data.last_sync) : undefined,
+        token_expires_at: data.token_expires_at ? new Date(data.token_expires_at) : undefined,
+        refresh_token_expires_at: data.refresh_token_expires_at ? new Date(data.refresh_token_expires_at) : undefined,
+        token_created_at: data.token_created_at ? new Date(data.token_created_at) : undefined,
+        last_token_refresh: data.last_token_refresh ? new Date(data.last_token_refresh) : undefined
       };
     } catch (error) {
       channelsLogger.error('TeamChannelRepository.updateTeamChannelCredentials error:', error);

@@ -87,18 +87,20 @@ export class TikTokApiClient {
     this.config = config;
   }
 
+  private generateRandomString(length: number): string {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let result = '';
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  }
+
   generatePKCEParams(): { codeChallenge: string; codeVerifier: string } {
-    const codeVerifier = crypto.randomBytes(32).toString("hex");
+    const codeVerifier = this.generateRandomString(64);
 
-    const base64url = (str: Buffer): string =>
-      str.toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-
-    const codeChallenge = base64url(
-      crypto.createHash("sha256").update(codeVerifier).digest()
-    );
+    const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("hex");
 
     return { codeChallenge, codeVerifier };
   }
@@ -106,9 +108,10 @@ export class TikTokApiClient {
   generateAuthUrl(
     redirectUri: string,
     state: string,
-    scopes: string[] = ['user.info.basic']
+    scopes: string[] = ['user.info.basic'],
+    codeChallenge: string
   ): string {
-    const { codeChallenge } = this.generatePKCEParams();
+    // const { codeChallenge } = this.generatePKCEParams();
     
     const scopeString = scopes.join(',');
 
@@ -130,7 +133,8 @@ export class TikTokApiClient {
     queryParams: Record<string, any> = {},
     body?: Record<string, any>,
     headers: Record<string, string> = {},
-    baseUrl?: string
+    baseUrl?: string,
+    contentType: 'json' | 'form' = 'json'
   ): Promise<any> {
     try {
       const baseHost = baseUrl || this.config.host;
@@ -139,16 +143,31 @@ export class TikTokApiClient {
         url.searchParams.append(key, value.toString());
       });
 
+      // Set default content type based on parameter
+      const defaultContentType = contentType === 'form' 
+        ? 'application/x-www-form-urlencoded' 
+        : 'application/json; charset=UTF-8';
+
       const requestOptions: RequestInit = {
         method,
         headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          ...headers
+          'Content-Type': defaultContentType,
+          ...headers // Allow override of Content-Type via headers parameter
         }
       };
 
       if (body && method === 'POST') {
-        requestOptions.body = JSON.stringify(body);
+        if (contentType === 'form' || headers['Content-Type']?.includes('application/x-www-form-urlencoded')) {
+          // Form encode the body
+          const formBody = new URLSearchParams();
+          Object.entries(body).forEach(([key, value]) => {
+            formBody.append(key, String(value));
+          });
+          requestOptions.body = formBody.toString();
+        } else {
+          // JSON encode the body (default)
+          requestOptions.body = JSON.stringify(body);
+        }
       }
 
       const response = await fetch(url.toString(), requestOptions);
@@ -159,6 +178,8 @@ export class TikTokApiClient {
       }
 
       const data = await response.json();
+
+      console.log('data', data);
 
       if (data.error) {
         throw new Error(`TikTok API error: ${data.error.message || 'Unknown error'}`);
@@ -175,7 +196,7 @@ export class TikTokApiClient {
     code: string,
     codeVerifier: string,
     redirectUri: string
-  ): Promise<{access_token: string, refresh_token?: string}> {
+  ): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     const requestBody = {
       client_key: this.config.clientKey,
       client_secret: this.config.appSecret,
@@ -185,15 +206,40 @@ export class TikTokApiClient {
       code_verifier: codeVerifier
     };
 
-    return await this.makeRequest(
-      '/oauth/access_token/',
+    const headers = {
+      'Cache-Control': 'no-cache'
+    };
+    
+    console.log('requestBody', requestBody);
+
+    const response = await this.makeRequest(
+      '/v2/oauth/token/',
       'POST',
       {},
-      requestBody
+      requestBody,
+      headers,
+      'https://open.tiktokapis.com',
+      'form'
     );
+
+    // Convert expires_in (seconds) to token_expired_at (Date)
+    if (response.expires_in) {
+      const now = new Date();
+      response.token_expired_at = new Date(now.getTime() + (response.expires_in * 1000));
+      delete response.expires_in;
+    }
+
+    // Convert refresh_expires_in (seconds) to refresh_token_expired_at (Date)
+    if (response.refresh_expires_in) {
+      const now = new Date();
+      response.refresh_token_expired_at = new Date(now.getTime() + (response.refresh_expires_in * 1000));
+      delete response.refresh_expires_in;
+    }
+
+    return response;
   }
 
-  async refreshAccessToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string}> {
+  async refreshAccessToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date}> {
     const requestBody = {
       client_key: this.config.clientKey,
       client_secret: this.config.appSecret,
@@ -201,12 +247,35 @@ export class TikTokApiClient {
       refresh_token: refreshToken
     };
 
-    return await this.makeRequest(
-      '/oauth/refresh_token/',
+    const headers = {
+      'Cache-Control': 'no-cache'
+    };
+
+    const response = await this.makeRequest(
+      '/v2/oauth/token/',
       'POST',
       {},
-      requestBody
+      requestBody,
+      headers,
+      'https://open.tiktokapis.com',
+      'form'
     );
+
+    // Convert expires_in (seconds) to token_expired_at (Date)
+    if (response.expires_in) {
+      const now = new Date();
+      response.token_expired_at = new Date(now.getTime() + (response.expires_in * 1000));
+      delete response.expires_in;
+    }
+
+    // Convert refresh_expires_in (seconds) to refresh_token_expired_at (Date)
+    if (response.refresh_expires_in) {
+      const now = new Date();
+      response.refresh_token_expired_at = new Date(now.getTime() + (response.refresh_expires_in * 1000));
+      delete response.refresh_expires_in;
+    }
+
+    return response;
   }
 
   async initVideoPublish(
