@@ -4,7 +4,7 @@
  */
 
 import crypto from 'crypto';
-import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
+import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "./interface/channel-base";
 import { channelsLogger } from "@/lib/logger";
 
 // Global type declarations for OAuth state storage
@@ -19,10 +19,10 @@ declare global {
 }
 
 export class TikTokShopChannel extends BaseChannel {
-  private readonly HOST = process.env.TIKTOK_SHOP_HOST || "https://open-api.tiktokglobalshop.com";
-  private readonly APP_KEY = process.env.TIKTOK_SHOP_APP_KEY || "";
-  private readonly APP_SECRET = process.env.TIKTOK_SHOP_APP_SECRET || "";
-  private readonly SERVICE_ID = process.env.TIKTOK_SHOP_SERVICE_ID || "7542438678683289352";
+  private readonly HOST = process.env.NEXT_PUBLIC_TIKTOK_SHOP_HOST || "https://open-api.tiktokglobalshop.com";
+  private readonly APP_KEY = process.env.NEXT_PUBLIC_TIKTOK_SHOP_APP_KEY || "";
+  private readonly APP_SECRET = process.env.NEXT_PUBLIC_TIKTOK_SHOP_APP_SECRET || "";
+  private readonly SERVICE_ID = process.env.NEXT_PUBLIC_TIKTOK_SHOP_SERVICE_ID || "7542438678683289352";
 
   constructor() {
     const config: ChannelConfig = {
@@ -34,7 +34,7 @@ export class TikTokShopChannel extends BaseChannel {
     super('tiktok shop', config);
   }
 
-  extractCredentials(params: Record<string, string>): ChannelCredentials {
+  async extractCredentials(params: Record<string, string>): Promise<ChannelCredentials> {
     return {
       shop_id: params.app_key,
       api_key: params.code
@@ -93,6 +93,15 @@ export class TikTokShopChannel extends BaseChannel {
     // TODO: Implement TikTok Shop-specific order fetching
     channelsLogger.debug(`Fetching orders from ${this.getName()}...`);
     return [];
+  }
+
+  async upload(files: File[], options: any): Promise<any> {
+    // TODO: Implement TikTok Shop-specific upload logic
+    channelsLogger.debug(`Uploading ${files.length} files to ${this.getName()}...`);
+    return {
+      success: false,
+      error: "TikTok Shop upload not yet implemented"
+    };
   }
 
   // Additional TikTok Shop-specific methods

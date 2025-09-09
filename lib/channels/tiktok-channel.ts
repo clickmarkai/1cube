@@ -3,17 +3,19 @@
  * Concrete implementation of BaseChannel for TikTok marketplace
  */
 
-import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
+import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "./interface/channel-base";
 import { channelsLogger } from "@/lib/logger";
 import { TikTokApiClient, type TikTokConfig } from "../api-clients/tiktok-api-client";
-import { SessionRepository } from "../repositories";
+import { SessionRepository, TeamUserService, TeamChannelService, ChannelService } from "../repositories";
+import { ChannelsService } from "../services";
+import { ChannelFactory } from "./factory/channels";
 
 
 export class TikTokChannel extends BaseChannel {
-  private readonly HOST = process.env.TIKTOK_HOST!;
-  private readonly APP_ID = process.env.TIKTOK_APP_ID!;
-  private readonly APP_SECRET = process.env.TIKTOK_APP_SECRET!;
-  private readonly CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY!;
+  private readonly HOST = process.env.NEXT_PUBLIC_TIKTOK_HOST!;
+  private readonly APP_ID = process.env.NEXT_PUBLIC_TIKTOK_APP_ID!;
+  private readonly APP_SECRET = process.env.NEXT_PUBLIC_TIKTOK_APP_SECRET!;
+  private readonly CLIENT_KEY = process.env.NEXT_PUBLIC_TIKTOK_CLIENT_KEY!;
   private apiClient: TikTokApiClient;
   private sessionRepository: SessionRepository;
 
@@ -32,14 +34,60 @@ export class TikTokChannel extends BaseChannel {
       appSecret: this.APP_SECRET,
       clientKey: this.CLIENT_KEY
     };
+    console.log('TikTokChannel constructor', apiConfig);
     this.apiClient = new TikTokApiClient(apiConfig);
     this.sessionRepository = new SessionRepository();
   }
 
-  extractCredentials(params: Record<string, string>): ChannelCredentials {
-    return {
-      api_key: params.code
-    };
+  async extractCredentials(params: Record<string, string>): Promise<ChannelCredentials> {
+    try {
+      // Get the code verifier from team_channel database
+      const verification = await this.sessionRepository.verifySessionState(params.state);
+      if (!verification.valid || !verification.userId) {
+        throw new Error('Invalid OAuth state or missing user information');
+      }
+
+      const sessionCodeVerifier = await this.sessionRepository.getCodeVerifier(params.state);
+      const codeVerifier = sessionCodeVerifier || undefined;
+
+      if (!codeVerifier) {
+        throw new Error('Code verifier not found in team_channel database or session storage');
+      }
+
+      // Create token map for getToken method
+      const tokenMap = new Map<string, string>();
+      tokenMap.set('code', params.code);
+      tokenMap.set('state', params.state);
+      tokenMap.set('redirect_uri', this.getRedirectUri());
+      tokenMap.set('code_verifier', codeVerifier);
+
+      channelsLogger.info('🔑 TikTok extractCredentials - Token map:', tokenMap);
+
+      // Call getToken to exchange authorization code for access tokens
+      const tokenResponse = await this.getToken(tokenMap);
+
+      // Return credentials with actual tokens
+      return {
+        api_key: params.code, // Keep original code for reference
+        token: tokenResponse.access_token,
+        refresh_token: tokenResponse.refresh_token,
+        code_verifier: codeVerifier,
+        token_expired_at: tokenResponse.token_expired_at,
+        refresh_token_expired_at: tokenResponse.refresh_token_expired_at,
+        token_type: 'Bearer',
+        scope: params.scope || params.scopes,
+        state: params.state
+      };
+    } catch (error) {
+      channelsLogger.error('❌ Failed to extract TikTok credentials:', error);
+      
+      // Fallback to just returning the authorization code if token exchange fails
+      return {
+        api_key: params.code,
+        state: params.state,
+        scope: params.scope || params.scopes
+      };
+    }
   }
 
   async validateSpecificParams(params: Record<string, string>): Promise<{ valid: boolean; error?: string }> {
@@ -74,22 +122,21 @@ export class TikTokChannel extends BaseChannel {
 
     channelsLogger.debug(`🔗 TikTok generateAuthLink - State: ${state}, UserId: ${params.userId}`);
 
-    const { codeVerifier } = this.apiClient.generatePKCEParams();
+    const { codeChallenge, codeVerifier } = this.apiClient.generatePKCEParams();
 
+    // Store session state for OAuth security
     await this.sessionRepository.storeSessionState(state, params.userId, 'tiktok', codeVerifier);
 
     // Default scopes for TikTok API access
     const defaultScopes = [
       'user.info.basic',
-      'user.info.profile',
-      'user.info.stats',
-      'video.list',
+      'video.publish',
       'video.upload'
     ];
 
     const scopes = params.scopes && params.scopes.length > 0 ? params.scopes : defaultScopes;
 
-    const authLink = this.apiClient.generateAuthUrl(redirectUri, state, scopes);
+    const authLink = this.apiClient.generateAuthUrl(redirectUri, state, scopes, codeChallenge);
 
     const verification = await this.sessionRepository.verifySessionState(state);
     if (!verification.valid) {
@@ -117,11 +164,199 @@ export class TikTokChannel extends BaseChannel {
     return [];
   }
 
-  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+  async upload(files: File[], options: any): Promise<any> {
+    try {
+      channelsLogger.debug(`Starting TikTok upload for ${files.length} files`);
+      
+      // Get user's access token for TikTok
+      const accessToken = await this.getUserAccessToken(options.userId);
+      if (!accessToken) {
+        return {
+          success: false,
+          error: "No TikTok access token found. Please connect your TikTok account first."
+        };
+      }
+
+      const results = [];
+      
+      // Process each file based on its type
+      for (const file of files) {
+        try {
+          const fileType = this.getFileType(file);
+          let result;
+          
+          if (fileType === 'video') {
+            result = await this.uploadVideo(file, options, accessToken);
+          } else if (fileType === 'image') {
+            result = await this.uploadImage(file, options, accessToken);
+          } else {
+            result = {
+              success: false,
+              filename: file.name || 'unknown',
+              error: `Unsupported file type: ${file.type}. TikTok supports videos and images only.`
+            };
+          }
+          
+          results.push(result);
+        } catch (fileError) {
+          channelsLogger.error(`Error processing file ${file.name}:`, fileError);
+          results.push({
+            success: false,
+            filename: file.name || 'unknown',
+            error: fileError instanceof Error ? fileError.message : 'File processing failed'
+          });
+        }
+      }
+      
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+      
+      channelsLogger.info(`TikTok upload complete: ${successCount} successful, ${failureCount} failed`);
+      
+      return {
+        success: successCount > 0,
+        results,
+        metadata: {
+          totalFiles: files.length,
+          successCount,
+          failureCount,
+          platform: 'TikTok'
+        }
+      };
+      
+    } catch (error) {
+      channelsLogger.error('TikTok upload error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown TikTok upload error'
+      };
+    }
+  }
+
+  private getFileType(file: File & { url?: string }): 'video' | 'image' | 'unsupported' {
+    const mimeType = file.type;
+    
+    if (mimeType.startsWith('video/')) {
+      return 'video';
+    } else if (mimeType.startsWith('image/')) {
+      return 'image';
+    }
+    
+    // Fallback to filename extension
+    const fileName = file.name || '';
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    
+    const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'];
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    
+    if (extension && videoExtensions.includes(extension)) {
+      return 'video';
+    } else if (extension && imageExtensions.includes(extension)) {
+      return 'image';
+    }
+    
+    return 'unsupported';
+  }
+
+  private async uploadVideo(file: File & { url?: string }, options: any, accessToken: string): Promise<any> {
+    try {
+      channelsLogger.debug(`Uploading video: ${file.name}, size: ${file.size}`);
+      
+      // Create video publish request
+      const videoRequest = this.apiClient.createVideoPublishRequest(
+        options.title || file.name || 'Untitled Video',
+        file.size,
+        {
+          privacyLevel: options.is_private ? 'SELF_ONLY' : 'PUBLIC_TO_EVERYONE',
+          disableDuet: options.disable_duet || false,
+          disableComment: options.disable_comment || false, 
+          disableStitch: options.disable_stitch || false,
+          videoCoverTimestampMs: options.video_cover_timestamp || 0
+        }
+      );
+      
+      // Initialize video upload with TikTok
+      const initResponse = await this.apiClient.initVideoPublish(accessToken, videoRequest);
+      
+      if (!initResponse.data?.publish_id) {
+        throw new Error(`TikTok video init failed: ${initResponse.error?.message || 'Unknown error'}`);
+      }
+      
+      channelsLogger.info(`✅ TikTok video upload initiated: ${file.name} -> publish_id: ${initResponse.data.publish_id}`);
+      
+      return {
+        success: true,
+        filename: file.name,
+        publishId: initResponse.data.publish_id,
+        uploadUrl: initResponse.data.upload_url,
+        platform: 'TikTok',
+        contentType: 'video',
+        supabaseUrl: file.url || '',
+        message: options.is_draft ? 'Video queued as draft' : 'Video upload initiated'
+      };
+      
+    } catch (error) {
+      channelsLogger.error(`TikTok video upload failed for ${file.name}:`, error);
+      throw error;
+    }
+  }
+
+  private async uploadImage(file: File & { url?: string }, options: any, accessToken: string): Promise<any> {
+    try {
+      channelsLogger.debug(`Uploading image: ${file.name}, size: ${file.size}`);
+      
+      // For images, we use the Supabase URL since TikTok supports PULL_FROM_URL
+      if (!file.url) {
+        throw new Error('Image URL is required for TikTok photo upload');
+      }
+      
+      // Create photo publish request
+      const photoRequest = this.apiClient.createPhotoPublishRequest(
+        options.title || file.name || 'Untitled Photo',
+        [file.url], // Use the Supabase URL
+        {
+          description: options.caption || '',
+          privacyLevel: options.is_private ? 'SELF_ONLY' : 'PUBLIC_TO_EVERYONE',
+          disableComment: options.disable_comment || false,
+          disableDuet: options.disable_duet || false,
+          disableStitch: options.disable_stitch || false,
+          autoAddMusic: true,
+          postMode: options.is_draft ? 'SCHEDULED_POST' : 'DIRECT_POST'
+        }
+      );
+      
+      // Initialize photo upload with TikTok
+      const initResponse = await this.apiClient.initPhotoPublish(accessToken, photoRequest);
+      
+      if (!initResponse.data?.publish_id) {
+        throw new Error(`TikTok photo init failed: ${initResponse.error?.message || 'Unknown error'}`);
+      }
+      
+      channelsLogger.info(`✅ TikTok photo upload initiated: ${file.name} -> publish_id: ${initResponse.data.publish_id}`);
+      
+      return {
+        success: true,
+        filename: file.name,
+        publishId: initResponse.data.publish_id,
+        platform: 'TikTok',
+        contentType: 'image',
+        supabaseUrl: file.url,
+        message: options.is_draft ? 'Photo queued as draft' : 'Photo upload initiated'
+      };
+      
+    } catch (error) {
+      channelsLogger.error(`TikTok photo upload failed for ${file.name}:`, error);
+      throw error;
+    }
+  }
+
+
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     try {
       const code = tokenMap.get('code');
       const state = tokenMap.get('state');
       const redirectUri = tokenMap.get('redirect_uri');
+      const codeVerifier = tokenMap.get('code_verifier');
 
       if (!code) {
         throw new Error('Authorization code is required');
@@ -135,16 +370,14 @@ export class TikTokChannel extends BaseChannel {
         throw new Error('Redirect URI is required');
       }
 
-      // Get the code verifier from stored state
-      const codeVerifier = await this.sessionRepository.getCodeVerifier(state);
       if (!codeVerifier) {
-        throw new Error('Code verifier not found for the provided state');
+        throw new Error('Code verifier is required for PKCE flow');
       }
 
       // Exchange authorization code for access token using API client
       const tokenResponse = await this.apiClient.getAccessToken(code, codeVerifier, redirectUri);
+      channelsLogger.info('🔑 TikTok getToken - Token response:', tokenResponse);
 
-      channelsLogger.info('✅ Successfully obtained access token from TikTok');
       return tokenResponse;
     } catch (error) {
       channelsLogger.error('❌ Failed to get TikTok access token:', error);
@@ -152,15 +385,18 @@ export class TikTokChannel extends BaseChannel {
     }
   }
 
-  async refreshToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string}> {
+  async refreshToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     try {
       const tokenResponse = await this.apiClient.refreshAccessToken(refreshToken);
       channelsLogger.info('✅ Successfully refreshed TikTok access token');
+      
       return tokenResponse;
     } catch (error) {
       channelsLogger.error('❌ Failed to refresh TikTok access token:', error);
       throw error;
     }
   }
+
+
 
 }

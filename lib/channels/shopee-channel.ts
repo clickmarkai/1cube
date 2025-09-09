@@ -4,9 +4,9 @@
  */
 
 import crypto from 'crypto';
-import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "../channel-base";
+import { BaseChannel, type ChannelCredentials, type ChannelConfig, type AuthLinkParams, type AuthLinkResult } from "./interface/channel-base";
 import { ChannelService, TeamUserService } from "../repositories";
-import { ChannelsService } from "../channels-service";
+import { ChannelsService } from "../services/channels-service";
 import { channelsLogger } from "@/lib/logger";
 
 // Global type declarations for OAuth state storage
@@ -35,7 +35,7 @@ export class ShopeeChannel extends BaseChannel {
     super('shopee', config);
   }
 
-  extractCredentials(params: Record<string, string>): ChannelCredentials {
+  async extractCredentials(params: Record<string, string>): Promise<ChannelCredentials> {
     return {
       shop_id: params.shop_id,
       api_key: params.code, // Shopee uses 'code' as API key from OAuth
@@ -289,6 +289,15 @@ export class ShopeeChannel extends BaseChannel {
     return [];
   }
 
+  async upload(files: File[], options: any): Promise<any> {
+    // TODO: Implement Shopee-specific upload logic
+    channelsLogger.debug(`Uploading ${files.length} files to ${this.getName()}...`);
+    return {
+      success: false,
+      error: "Shopee upload not yet implemented"
+    };
+  }
+
   // Database-based session state storage  
   private async storeSessionState(state: string, userId: string, channelName: string): Promise<void> {
     try {
@@ -426,7 +435,7 @@ export class ShopeeChannel extends BaseChannel {
     }
   }
 
-  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     try {
       const timestamp = Math.floor(Date.now() / 1000);
       const apiPath = "/api/v2/auth/token/get";
@@ -483,7 +492,57 @@ export class ShopeeChannel extends BaseChannel {
     }
   }
 
-  async refreshToken(shopId: string, refreshToken: string): Promise<{access_token: string, refresh_token?: string}> {
+  // Override base class method to handle Shopee's shopId requirement
+  protected async refreshTokenIfNeeded(teamChannelConfig: any): Promise<string | null> {
+    try {
+      const now = new Date();
+      const bufferTime = 10 * 60 * 1000; // 10 minutes buffer
+      const tokenExpiresAt = teamChannelConfig.token_expires_at ? new Date(teamChannelConfig.token_expires_at) : null;
+      
+      // Check if token is expiring soon
+      if (tokenExpiresAt && tokenExpiresAt.getTime() <= (now.getTime() + bufferTime)) {
+        channelsLogger.info(`🔄 ${this.channelName} access token expiring soon, attempting refresh...`);
+        
+        if (!teamChannelConfig.refresh_token) {
+          channelsLogger.error(`❌ No refresh token available for ${this.channelName}`);
+          return null;
+        }
+        
+        if (!teamChannelConfig.shop_id) {
+          channelsLogger.error(`❌ No shop_id available for ${this.channelName} refresh`);
+          return null;
+        }
+        
+        // Check if refresh token is still valid
+        const refreshTokenExpiresAt = teamChannelConfig.refresh_token_expires_at ? new Date(teamChannelConfig.refresh_token_expires_at) : null;
+        if (refreshTokenExpiresAt && refreshTokenExpiresAt.getTime() <= now.getTime()) {
+          channelsLogger.error(`❌ ${this.channelName} refresh token has expired`);
+          return null;
+        }
+        
+        // Call Shopee-specific refresh method
+        const tokenResponse = await this._refreshShopeeToken(teamChannelConfig.shop_id, teamChannelConfig.refresh_token);
+        
+        // Update tokens in database
+        await this.updateTokensInDatabase(teamChannelConfig.team, teamChannelConfig.channel_id, tokenResponse);
+        
+        channelsLogger.info(`✅ Successfully refreshed ${this.channelName} access token`);
+        return tokenResponse.access_token;
+      }
+      
+      // Token is still valid
+      return teamChannelConfig.token;
+    } catch (error) {
+      channelsLogger.error(`❌ Failed to refresh ${this.channelName} token:`, error);
+      return null;
+    }
+  }
+
+  async refreshToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
+    throw new Error('Shopee refreshToken requires shopId. Use refreshTokenIfNeeded instead.');
+  }
+
+  private async _refreshShopeeToken(shopId: string, refreshToken: string): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     try {
       const timestamp = Math.floor(Date.now() / 1000);
       const apiPath = "/api/v2/auth/access_token/get";
@@ -546,19 +605,13 @@ export class ShopeeChannel extends BaseChannel {
         throw new Error(`Channel ${this.channelName} not found in database`);
       }
 
-      // Get team ID for the user
-      const DEFAULT_TEAM_ID = "4aaa07c6-8291-441d-bcf6-1b6621bb27d1";
       let teamId: string;
       try {
         const userTeamId = await TeamUserService.getTeamIdByUserId(userId);
-        teamId = userTeamId || DEFAULT_TEAM_ID;
-        
-        if (!userTeamId) {
-          channelsLogger.warn(`User ${userId} not found in any team, using default team ${DEFAULT_TEAM_ID}`);
-        }
+        teamId = userTeamId!;
       } catch (error) {
         channelsLogger.error(`Error getting team for user ${userId}:`, error);
-        teamId = DEFAULT_TEAM_ID;
+        throw error;
       }
 
       // Call getToken API to get access and refresh tokens

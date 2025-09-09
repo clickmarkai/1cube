@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ChannelFactory } from "@/lib/channels";
+import { ChannelFactory } from "@/lib/channels/factory/channels";
 
 interface RouteParams {
   params: Promise<{
@@ -11,8 +11,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { channel } = await params;
   
   try {
-    // Factory handles validation internally - no need to verify channel
-    return ChannelFactory.getChannel(channel).callback(request);
+    const channelInstance = ChannelFactory.getChannel(channel);
+    if (!channelInstance) {
+      throw new Error(`Unsupported channel: ${channel}`);
+    }
+    
+    return channelInstance.callback(request);
 
   } catch (error) {
     console.error(`Error in ${channel} OAuth callback:`, error);

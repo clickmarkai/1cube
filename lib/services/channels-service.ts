@@ -3,9 +3,9 @@
  * Provides the interface you want while working with existing database schema
  */
 
-import { ChannelService, ChannelType, TeamChannelService, TeamChannelConfig, TeamUserService } from "./repositories";
-import { ChannelInfo } from "./channels";
-import { channelsLogger } from "./logger";
+import { ChannelService, ChannelType, TeamChannelService, TeamChannelConfig, TeamUserService } from "../repositories";
+import { ChannelInfo } from "../channels/factory/channels";
+import { channelsLogger } from "../logger";
 
 export interface TeamInfo {
   id: string;
@@ -75,6 +75,9 @@ export const ChannelsService = {
       api_secret?: string;
       token?: string;
       refresh_token?: string;
+      code_verifier?: string;
+      token_expired_at?: Date;
+      refresh_token_expired_at?: Date;
     }
   ): Promise<TeamChannelConfig> {
     const config: TeamChannelConfig = {
@@ -85,6 +88,9 @@ export const ChannelsService = {
       api_secret: credentials?.api_secret,
       token: credentials?.token,
       refresh_token: credentials?.refresh_token,
+      code_verifier: credentials?.code_verifier,
+      token_expires_at: credentials?.token_expired_at,
+      refresh_token_expires_at: credentials?.refresh_token_expired_at,
       connected: true,
       last_sync: new Date()
     };
@@ -111,6 +117,7 @@ export const ChannelsService = {
       api_secret?: string;
       token?: string;
       refresh_token?: string;
+      code_verifier?: string;
     }
   ): Promise<TeamChannelConfig | null> {
     return TeamChannelService.updateTeamChannelCredentials(teamId, channelId, credentials);
