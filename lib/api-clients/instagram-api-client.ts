@@ -112,6 +112,117 @@ export class InstagramApiClient {
     }
   }
 
+  async createMedia(igUserId: string, accessToken: string, imageUrl: string, caption?: string): Promise<{
+    id: string;
+  }> {
+    try {
+      const apiVersion = 'v21.0';
+      const requestBody: any = {
+        image_url: imageUrl
+      };
+
+      if (caption) {
+        requestBody.caption = caption;
+      }
+
+      const response = await fetch(`${INSTAGRAM_HOSTS.GRAPH}/${apiVersion}/${igUserId}/media`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Instagram media creation failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`Instagram media creation error: ${data.error.message} (${data.error.code})`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Instagram media creation failed:', error);
+      throw error;
+    }
+  }
+
+  async createCarouselMedia(igUserId: string, accessToken: string, caption: string, childrenContainerIds: string[]): Promise<{
+    id: string;
+  }> {
+    try {
+      const apiVersion = 'v23.0';
+      const requestBody = {
+        caption: caption,
+        media_type: 'CAROUSEL',
+        children: childrenContainerIds.join(',')
+      };
+
+      const response = await fetch(`${INSTAGRAM_HOSTS.GRAPH}/${apiVersion}/${igUserId}/media`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Instagram carousel media creation failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`Instagram carousel media creation error: ${data.error.message} (${data.error.code})`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Instagram carousel media creation failed:', error);
+      throw error;
+    }
+  }
+
+  async publishMedia(igUserId: string, accessToken: string, creationId: string): Promise<{
+    id: string;
+  }> {
+    try {
+      const apiVersion = 'v21.0';
+      const requestBody = {
+        creation_id: creationId
+      };
+
+      const response = await fetch(`${INSTAGRAM_HOSTS.GRAPH}/${apiVersion}/${igUserId}/media_publish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Instagram media publishing failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(`Instagram media publishing error: ${data.error.message} (${data.error.code})`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Instagram media publishing failed:', error);
+      throw error;
+    }
+  }
+
   generateAuthUrl(redirectUri: string, state: string, scope?: string[]): string {
     const defaultScopes = [
       'instagram_business_basic',

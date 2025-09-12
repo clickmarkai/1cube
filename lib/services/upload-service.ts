@@ -6,6 +6,7 @@
 import { channelsLogger } from "../logger";
 import { db } from "../database/database-connection";
 import { ChannelFactory } from "../channels/factory/channels";
+import { ChannelService, TeamUserService, TeamChannelService } from "../repositories";
 
 export interface UploadOptions {
   // Content settings (required when coming from API)
@@ -136,6 +137,33 @@ export const UploadService = {
           
           const channel = ChannelFactory.getChannel(options.channel);
           if (channel) {
+            // Get team and channel information for the user
+            let teamChannelInfo = null;
+            if (options.userId) {
+              try {
+                // Get user's team ID
+                const teamId = await TeamUserService.getTeamIdByUserId(options.userId);
+                if (teamId) {
+                  // Get channel type ID
+                  const channelType = await ChannelService.getChannelTypeByName(options.channel.toLowerCase());
+                  if (channelType) {
+                    // Get team channel configuration
+                    const teamChannelConfig = await TeamChannelService.getTeamChannel(teamId, channelType.id);
+                    if (teamChannelConfig) {
+                      teamChannelInfo = {
+                        teamId,
+                        channelTypeId: channelType.id,
+                        teamChannelConfig
+                      };
+                      channelsLogger.debug(`📋 Retrieved team/channel info for ${options.channel}: teamId=${teamId}, channelId=${channelType.id}`);
+                    }
+                  }
+                }
+              } catch (teamChannelError) {
+                channelsLogger.warn(`⚠️ Could not get team/channel info for user ${options.userId}:`, teamChannelError);
+              }
+            }
+
             // Create File-like objects from the uploaded data for channel processing
             const processedFiles = successfulUploads.map(upload => {
               // Create a file-like object with the uploaded data
@@ -155,7 +183,8 @@ export const UploadService = {
             channelResult = await channel.upload(processedFiles, {
               ...options,
               supabaseFiles: successfulUploads, // Pass Supabase upload results
-              publicUrls: successfulUploads.map(f => f.fileUrl)
+              publicUrls: successfulUploads.map(f => f.fileUrl),
+              teamChannelInfo // Pass team/channel information
             });
             
             channelsLogger.info(`✅ ${options.channel} channel processing completed`);

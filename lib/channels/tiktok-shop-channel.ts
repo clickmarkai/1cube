@@ -104,79 +104,6 @@ export class TikTokShopChannel extends BaseChannel {
     };
   }
 
-  // Additional TikTok Shop-specific methods
-  async getShopInfo(): Promise<any> {
-    // TODO: Implement TikTok Shop info fetching
-    channelsLogger.debug(`Fetching shop info from ${this.getName()}...`);
-    return {};
-  }
-
-  async getCategories(): Promise<any[]> {
-    // TODO: Implement TikTok Shop categories fetching
-    channelsLogger.debug(`Fetching categories from ${this.getName()}...`);
-    return [];
-  }
-
-  async createProduct(productData: any): Promise<any> {
-    // TODO: Implement TikTok Shop product creation
-    channelsLogger.debug(`Creating product on ${this.getName()}...`);
-    return null;
-  }
-
-  async updateProduct(productId: string, productData: any): Promise<any> {
-    // TODO: Implement TikTok Shop product update
-    channelsLogger.debug(`Updating product ${productId} on ${this.getName()}...`);
-    return null;
-  }
-
-  async getInventory(): Promise<any[]> {
-    // TODO: Implement TikTok Shop inventory fetching
-    channelsLogger.debug(`Fetching inventory from ${this.getName()}...`);
-    return [];
-  }
-
-  async updateInventory(inventoryData: any): Promise<any> {
-    // TODO: Implement TikTok Shop inventory update
-    channelsLogger.debug(`Updating inventory on ${this.getName()}...`);
-    return null;
-  }
-
-  async getPromotions(): Promise<any[]> {
-    // TODO: Implement TikTok Shop promotions fetching
-    channelsLogger.debug(`Fetching promotions from ${this.getName()}...`);
-    return [];
-  }
-
-  async createPromotion(promotionData: any): Promise<any> {
-    // TODO: Implement TikTok Shop promotion creation
-    channelsLogger.debug(`Creating promotion on ${this.getName()}...`);
-    return null;
-  }
-
-  async getAnalytics(): Promise<any> {
-    // TODO: Implement TikTok Shop analytics fetching
-    channelsLogger.debug(`Fetching analytics from ${this.getName()}...`);
-    return {};
-  }
-
-  async getCustomers(): Promise<any[]> {
-    // TODO: Implement TikTok Shop customers fetching
-    channelsLogger.debug(`Fetching customers from ${this.getName()}...`);
-    return [];
-  }
-
-  async getShipping(): Promise<any[]> {
-    // TODO: Implement TikTok Shop shipping info fetching
-    channelsLogger.debug(`Fetching shipping info from ${this.getName()}...`);
-    return [];
-  }
-
-  async updateShipping(shippingData: any): Promise<any> {
-    // TODO: Implement TikTok Shop shipping update
-    channelsLogger.debug(`Updating shipping on ${this.getName()}...`);
-    return null;
-  }
-
   // Database-based session state storage methods
   private async storeSessionState(state: string, userId: string, channelName: string): Promise<void> {
     try {
@@ -313,23 +240,9 @@ export class TikTokShopChannel extends BaseChannel {
     }
   }
 
-  // PKCE methods for OAuth security
-  private generatePKCEParams(): { codeChallenge: string; codeVerifier: string } {
-    // TODO: Implement PKCE parameter generation for TikTok Shop
-    const codeVerifier = '';
-    const codeChallenge = '';
-    return { codeChallenge, codeVerifier };
-  }
-
-  private async storeCodeVerifier(state: string, codeVerifier: string): Promise<void> {
-    // TODO: Implement code verifier storage for TikTok Shop
-    channelsLogger.debug(`Storing code verifier for TikTok Shop state: ${state}`);
-  }
-
-  private async getCodeVerifier(state: string): Promise<string | null> {
-    // TODO: Implement code verifier retrieval for TikTok Shop
-    channelsLogger.debug(`Retrieving code verifier for TikTok Shop state: ${state}`);
-    return null;
+  async refreshToken(refreshToken: string): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
+    // TODO: Implement TikTok Shop token refresh
+    throw new Error('TikTok Shop refreshToken not implemented yet');
   }
 
   async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string}> {
