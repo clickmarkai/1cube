@@ -8,6 +8,7 @@ import { ShopeeChannel } from "../shopee-channel";
 import { TikTokChannel } from "../tiktok-channel";
 import { TikTokShopChannel } from "../tiktok-shop-channel";
 import { channelsLogger } from "../../logger";
+import { InstagramChannel } from "../instagram-channel";
 
 /**
  * Channel information for UI display
@@ -50,6 +51,9 @@ export class ChannelFactory {
       case 'tiktok shop':
         channel = new TikTokShopChannel();
         break;
+      case 'instagram':
+        channel = new InstagramChannel();
+        break;
       default:
         channelsLogger.warn(`Unknown channel requested: ${channelName}`);
         return null;
@@ -64,7 +68,7 @@ export class ChannelFactory {
    * Get all available channel names
    */
   static getAvailableChannels(): string[] {
-    return ['shopee', 'tiktok', 'tiktok shop'];
+    return ['shopee', 'tiktok', 'tiktok shop', 'instagram'];
   }
 
   /**

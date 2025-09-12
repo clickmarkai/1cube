@@ -216,10 +216,10 @@ export abstract class BaseChannel {
     if (customRedirectUri) {
       return customRedirectUri;
     }
-    // return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
+    return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
     
     // For Faster Debugging, use this instead of the above
-    return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
+    // return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
     // return `${process.env.BASE_URL || 'http://localhost:3000'}/api/callback/auth/${this.channelName.toLowerCase()}`;
   }
 
