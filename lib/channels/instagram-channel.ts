@@ -49,9 +49,10 @@ export class InstagramChannel extends BaseChannel {
       // Call getToken to exchange authorization code for access tokens
       const tokenResponse = await this.getToken(tokenMap);
 
-      // Return credentials with actual tokens
+      // Return credentials with actual tokens and Instagram user ID
       return {
         api_key: params.code, // Keep original code for reference
+        shop_id: tokenResponse.user_id, // Store Instagram user ID in shop_id field
         token: tokenResponse.access_token,
         refresh_token: tokenResponse.refresh_token,
         token_expired_at: tokenResponse.token_expired_at,
@@ -156,7 +157,7 @@ export class InstagramChannel extends BaseChannel {
     }
   }
 
-  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
+  async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date, user_id?: string}> {
     try {
       const code = tokenMap.get('code');
       const redirectUri = tokenMap.get('redirect_uri');
@@ -190,7 +191,8 @@ export class InstagramChannel extends BaseChannel {
         // Instagram doesn't provide refresh tokens in the traditional sense - tokens are refreshed by calling refresh endpoint
         refresh_token: longTokenResponse.access_token, // Use the same token for refresh
         token_expired_at: tokenExpiredAt,
-        refresh_token_expired_at: tokenExpiredAt // Same expiration for both
+        refresh_token_expired_at: tokenExpiredAt, // Same expiration for both
+        user_id: shortTokenResponse.user_id // Include Instagram user ID
       };
     } catch (error) {
       channelsLogger.error('❌ Failed to get Instagram access token:', error);
@@ -214,7 +216,121 @@ export class InstagramChannel extends BaseChannel {
   }
 
   async upload(files: File[], options: any): Promise<any> {
-    // TODO: Implement Instagram upload
-    throw new Error('upload not implemented yet');
+    try {
+      channelsLogger.info(`🚀 Starting Instagram upload for ${files.length} files`);
+
+      // Validate files
+      if (!files || files.length === 0) {
+        throw new Error('No files provided for upload');
+      }
+
+      // Validate team/channel information passed from upload service
+      if (!options.teamChannelInfo) {
+        throw new Error('Team and channel information not provided. Please ensure you are connected to Instagram.');
+      }
+
+      const { teamChannelConfig } = options.teamChannelInfo;
+      
+      if (!teamChannelConfig?.shop_id) {
+        throw new Error('Instagram user ID not found. Please reconnect your Instagram account.');
+      }
+
+      if (!teamChannelConfig.connected) {
+        throw new Error('Instagram account is not connected. Please reconnect your Instagram account.');
+      }
+
+      // Get user access token and Instagram user ID
+      const accessToken = await this.getUserAccessToken(options.userId);
+      if (!accessToken) {
+        throw new Error('No valid Instagram access token found. Please reconnect your Instagram account.');
+      }
+
+      const igUserId = teamChannelConfig.shop_id; // Instagram user ID is stored in shop_id field
+      const caption = options.caption || options.title || '';
+
+      channelsLogger.debug(`📸 Creating media containers for ${files.length} files`);
+
+      // Step 1: Create media containers for each file
+      const mediaContainers = [];
+      for (const file of files) {
+        const fileUrl = (file as any).url; // URL from Supabase upload
+        
+        if (!fileUrl) {
+          channelsLogger.warn(`⚠️ Skipping file ${file.name} - no URL available`);
+          continue;
+        }
+
+        try {
+          channelsLogger.debug(`📤 Creating media container for: ${file.name}`);
+          const mediaContainer = await this.apiClient.createMedia(
+            igUserId,
+            accessToken,
+            fileUrl,
+            files.length === 1 ? caption : undefined // Only add caption for single posts
+          );
+          
+          mediaContainers.push(mediaContainer);
+          channelsLogger.info(`✅ Created media container: ${mediaContainer.id} for ${file.name}`);
+        } catch (error) {
+          channelsLogger.error(`❌ Failed to create media container for ${file.name}:`, error);
+          throw error;
+        }
+      }
+
+      if (mediaContainers.length === 0) {
+        throw new Error('No media containers were created successfully');
+      }
+
+      // Step 2: Handle single vs multiple files
+      let finalContainerId: string;
+
+      if (mediaContainers.length === 1) {
+        // Single post - use the media container directly
+        finalContainerId = mediaContainers[0].id;
+        channelsLogger.info('📱 Single media post - proceeding to publish');
+      } else {
+        // Multiple files - create carousel
+        channelsLogger.info(`🎠 Creating carousel with ${mediaContainers.length} media items`);
+        
+        const carouselContainer = await this.apiClient.createCarouselMedia(
+          igUserId,
+          accessToken,
+          caption,
+          mediaContainers.map(container => container.id)
+        );
+        
+        finalContainerId = carouselContainer.id;
+        channelsLogger.info(`✅ Created carousel container: ${finalContainerId}`);
+      }
+
+      // Step 3: Publish the media
+      channelsLogger.info(`🎯 Publishing media container: ${finalContainerId}`);
+      
+      const publishedMedia = await this.apiClient.publishMedia(
+        igUserId,
+        accessToken,
+        finalContainerId
+      );
+
+      channelsLogger.info(`🎉 Successfully published Instagram post: ${publishedMedia.id}`);
+
+      return {
+        success: true,
+        mediaId: publishedMedia.id,
+        containerId: finalContainerId,
+        mediaContainers: mediaContainers.map(c => c.id),
+        isCarousel: mediaContainers.length > 1,
+        fileCount: files.length,
+        message: `Successfully published ${mediaContainers.length > 1 ? 'carousel' : 'single'} post to Instagram`
+      };
+
+    } catch (error) {
+      channelsLogger.error('❌ Instagram upload failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+        fileCount: files?.length || 0
+      };
+    }
   }
 }
