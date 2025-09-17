@@ -9,6 +9,7 @@ import { TikTokChannel } from "../tiktok-channel";
 import { TikTokShopChannel } from "../tiktok-shop-channel";
 import { channelsLogger } from "../../logger";
 import { InstagramChannel } from "../instagram-channel";
+import { FacebookChannel } from "../facebook-channel";
 
 /**
  * Channel information for UI display
@@ -53,6 +54,9 @@ export class ChannelFactory {
         break;
       case 'instagram':
         channel = new InstagramChannel();
+        break;
+      case 'facebook':
+        channel = new FacebookChannel();
         break;
       default:
         channelsLogger.warn(`Unknown channel requested: ${channelName}`);
