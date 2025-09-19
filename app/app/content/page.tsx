@@ -1,317 +1,441 @@
 "use client";
 
-import { useState } from "react";
-import { FileText, Sparkles, Globe, AlertCircle, TrendingUp, Copy, RefreshCw } from "lucide-react";
-import { wellnessCopyPrompts, checkCompliance, trendingAngles } from "@/lib/prompts/wellness-copy";
+import { useState, useEffect } from "react";
+import { Upload, Play, Heart, MessageCircle, Share, MoreHorizontal, X, FileVideo, Image } from "lucide-react";
 
-interface GeneratedContent {
+interface ContentItem {
   id: string;
-  prompt: string;
-  content: string;
-  language: "id" | "en";
-  angle: string;
-  complianceIssues: Array<{text: string, risk: string, suggestion: string}>;
-  timestamp: Date;
+  title: string;
+  caption: string;
+  thumbnail: string;
+  video_url?: string;
+  platform: "tiktok" | "instagram";
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  upload_date: Date;
+  is_draft: boolean;
+}
+
+interface UploadFormData {
+  is_draft: boolean;
+  title: string;
+  caption: string;
+  disable_duet: boolean;
+  disable_stitch: boolean;
+  disable_comment: boolean;
+  video_cover_timestamp: number;
+  brand_content: boolean;
+  brand_organic: boolean;
+  is_private: boolean;
+  channel: string;
+  files: File[];
 }
 
 export default function ContentPage() {
-  const [selectedAngle, setSelectedAngle] = useState("transformation");
-  const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">("id");
-  const [productInfo, setProductInfo] = useState({
-    name: "",
-    category: "",
-    benefits: "",
+  const [selectedPlatform, setSelectedPlatform] = useState<"tiktok" | "instagram">("tiktok");
+  const [content, setContent] = useState<ContentItem[]>([]);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadForm, setUploadForm] = useState<UploadFormData>({
+    is_draft: false,
+    title: "",
+    caption: "",
+    disable_duet: false,
+    disable_stitch: false,
+    disable_comment: false,
+    video_cover_timestamp: 0,
+    brand_content: false,
+    brand_organic: false,
+    is_private: false,
+    channel: "",
+    files: [],
   });
-  const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
 
-  const angles = [
-    { id: "transformation", name: "Transformation Story", icon: "✨" },
-    { id: "community", name: "Community Building", icon: "👥" },
-    { id: "routine", name: "Daily Routine", icon: "🌅" },
-    { id: "bundle", name: "Bundle Offer", icon: "🎁" },
-  ];
+  // Dummy function to fetch content - will be implemented later
+  const fetchContent = async (platform: "tiktok" | "instagram") => {
+    // TODO: Implement actual API call
+    console.log(`Fetching content for ${platform}`);
+    setContent([]);
+  };
 
-  const handleGenerate = async () => {
-    if (!productInfo.name || !productInfo.benefits) {
-      alert("Please fill in product name and benefits");
+  useEffect(() => {
+    fetchContent(selectedPlatform);
+  }, [selectedPlatform]);
+
+  const handleUpload = async () => {
+    if (uploadForm.files.length === 0) {
+      alert("Please select files to upload");
       return;
     }
 
-    setIsGenerating(true);
+    setIsUploading(true);
 
-    // Simulate AI generation
-    setTimeout(() => {
-      const mockContent = selectedLanguage === "id" 
-        ? `✨ ${productInfo.name} - Transformasi Sehatmu Dimulai! ✨\n\n${productInfo.benefits}\n\nRibuan wanita Indonesia sudah membuktikan hasilnya dalam 14 hari!\n\n🎁 PROMO SPESIAL HARI INI\nBeli 2 GRATIS 1 + Free Ongkir\n\n📲 Pesan sekarang via link di bio!\n\n#WellnessIndonesia #${productInfo.name.replace(/\s+/g, '')} #SehatAlami`
-        : `✨ Transform Your Wellness Journey with ${productInfo.name}! ✨\n\n${productInfo.benefits}\n\nJoin thousands who've seen results in just 14 days!\n\n🎁 TODAY'S SPECIAL OFFER\nBuy 2 Get 1 FREE + Free Shipping\n\n📲 Order now via link in bio!\n\n#WellnessJourney #${productInfo.name.replace(/\s+/g, '')} #HealthyLiving`;
-
-      const complianceIssues = checkCompliance(mockContent);
-
-      const newContent: GeneratedContent = {
-        id: Date.now().toString(),
-        prompt: `${selectedAngle} for ${productInfo.name}`,
-        content: mockContent,
-        language: selectedLanguage,
-        angle: selectedAngle,
-        complianceIssues,
-        timestamp: new Date(),
-      };
-
-      setGeneratedContent([newContent, ...generatedContent]);
-      setIsGenerating(false);
-    }, 2000);
-  };
-
-  const handleCopy = (content: string) => {
-    navigator.clipboard.writeText(content);
-    // Show toast notification
-  };
-
-  const handleRegenerate = (id: string) => {
-    const content = generatedContent.find(c => c.id === id);
-    if (content) {
-      setProductInfo({
-        name: productInfo.name,
-        category: productInfo.category,
-        benefits: productInfo.benefits,
+    try {
+      const formData = new FormData();
+      
+      // Add files
+      uploadForm.files.forEach(file => {
+        formData.append('files', file);
       });
-      setSelectedAngle(content.angle);
-      setSelectedLanguage(content.language);
-      handleGenerate();
+
+      // Add form fields
+      formData.append('is_draft', uploadForm.is_draft.toString());
+      formData.append('title', uploadForm.title);
+      formData.append('caption', uploadForm.caption);
+      formData.append('disable_duet', uploadForm.disable_duet.toString());
+      formData.append('disable_stitch', uploadForm.disable_stitch.toString());
+      formData.append('disable_comment', uploadForm.disable_comment.toString());
+      formData.append('video_cover_timestamp', uploadForm.video_cover_timestamp.toString());
+      formData.append('brand_content', uploadForm.brand_content.toString());
+      formData.append('brand_organic', uploadForm.brand_organic.toString());
+      formData.append('is_private', uploadForm.is_private.toString());
+      formData.append('channel', selectedPlatform);
+
+      const response = await fetch('/api/content/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('Content uploaded successfully!');
+        setIsUploadModalOpen(false);
+        // Reset form
+        setUploadForm({
+          is_draft: false,
+          title: "",
+          caption: "",
+          disable_duet: false,
+          disable_stitch: false,
+          disable_comment: false,
+          video_cover_timestamp: 0,
+          brand_content: false,
+          brand_organic: false,
+          is_private: false,
+          channel: "",
+          files: [],
+        });
+        // Refresh content
+        fetchContent(selectedPlatform);
+      } else {
+        alert(`Upload failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed: Network error');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Content Studio</h1>
-        <p className="text-gray-600 mt-1">AI-powered content generation for wellness products</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Content Management</h1>
+          <p className="text-gray-600 mt-1">Manage your TikTok and Instagram content</p>
+        </div>
+        <button
+          onClick={() => setIsUploadModalOpen(true)}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          Upload Content
+        </button>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Input Panel */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Product Info */}
-          <div className="card">
-            <h3 className="font-semibold mb-4">Product Information</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="label block mb-2">Product Name</label>
-                <input
-                  type="text"
-                  className="input w-full"
-                  placeholder="e.g., Vitamin C Serum"
-                  value={productInfo.name}
-                  onChange={(e) => setProductInfo({ ...productInfo, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="label block mb-2">Category</label>
-                <select
-                  className="input w-full"
-                  value={productInfo.category}
-                  onChange={(e) => setProductInfo({ ...productInfo, category: e.target.value })}
-                >
-                  <option value="">Select category</option>
-                  <option value="skincare">Skincare</option>
-                  <option value="supplements">Supplements</option>
-                  <option value="fitness">Fitness</option>
-                  <option value="healthy-food">Healthy Food</option>
-                </select>
-              </div>
-              <div>
-                <label className="label block mb-2">Key Benefits</label>
-                <textarea
-                  className="input w-full h-24"
-                  placeholder="e.g., Brightens skin, reduces dark spots, boosts collagen"
-                  value={productInfo.benefits}
-                  onChange={(e) => setProductInfo({ ...productInfo, benefits: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Content Settings */}
-          <div className="card">
-            <h3 className="font-semibold mb-4">Content Settings</h3>
-            
-            {/* Language Toggle */}
-            <div className="mb-4">
-              <label className="label block mb-2">Language</label>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setSelectedLanguage("id")}
-                  className={`flex-1 py-2 px-4 rounded-lg border transition-colors ${
-                    selectedLanguage === "id"
-                      ? "bg-primary text-white border-primary"
-                      : "border-gray-300 hover:border-primary"
-                  }`}
-                >
-                  🇮🇩 Bahasa
-                </button>
-                <button
-                  onClick={() => setSelectedLanguage("en")}
-                  className={`flex-1 py-2 px-4 rounded-lg border transition-colors ${
-                    selectedLanguage === "en"
-                      ? "bg-primary text-white border-primary"
-                      : "border-gray-300 hover:border-primary"
-                  }`}
-                >
-                  🇺🇸 English
-                </button>
-              </div>
-            </div>
-
-            {/* Angle Selection */}
-            <div>
-              <label className="label block mb-2">Content Angle</label>
-              <div className="grid grid-cols-2 gap-2">
-                {angles.map((angle) => (
-                  <button
-                    key={angle.id}
-                    onClick={() => setSelectedAngle(angle.id)}
-                    className={`p-3 rounded-lg border transition-all ${
-                      selectedAngle === angle.id
-                        ? "bg-primary-lighter border-primary"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="text-xl mb-1">{angle.icon}</div>
-                    <div className="text-xs font-medium">{angle.name}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Generate Button */}
+      {/* Platform Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
           <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="btn-primary w-full py-3 flex items-center justify-center"
+            onClick={() => setSelectedPlatform("tiktok")}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              selectedPlatform === "tiktok"
+                ? "border-primary text-primary"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
           >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-5 w-5 mr-2" />
-                Generate Content
-              </>
-            )}
+            📱 TikTok
           </button>
-        </div>
+          <button
+            onClick={() => setSelectedPlatform("instagram")}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              selectedPlatform === "instagram"
+                ? "border-primary text-primary"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            📷 Instagram
+          </button>
+        </nav>
+      </div>
 
-        {/* Generated Content */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Trending Angles */}
-          <div className="card">
-            <h3 className="font-semibold mb-4 flex items-center">
-              <TrendingUp className="h-5 w-5 mr-2 text-primary" />
-              Trending Angles
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {trendingAngles.slice(0, 6).map((angle) => (
-                <div key={angle.name} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium">{angle.name}</span>
-                    <span className="text-xs text-primary font-semibold">{angle.score}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className="bg-primary h-1.5 rounded-full"
-                      style={{ width: `${angle.score}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Generated Results */}
-          {generatedContent.length === 0 ? (
-            <div className="card text-center py-12">
-              <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No content generated yet</p>
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {content.length === 0 ? (
+          <div className="col-span-full">
+            <div className="text-center py-12">
+              <FileVideo className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No content found for {selectedPlatform}</p>
               <p className="text-sm text-gray-400 mt-1">
-                Fill in product details and click generate to start
+                Upload your first content to get started
               </p>
             </div>
-          ) : (
-            generatedContent.map((content) => (
-              <div key={content.id} className="card">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-gray-500">
-                        {angles.find(a => a.id === content.angle)?.name}
-                      </span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-400">
-                        {content.language === "id" ? "Bahasa Indonesia" : "English"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {new Date(content.timestamp).toLocaleString("id-ID")}
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleCopy(content.content)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Copy"
-                    >
-                      <Copy className="h-4 w-4 text-gray-600" />
-                    </button>
-                    <button
-                      onClick={() => handleRegenerate(content.id)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Regenerate"
-                    >
-                      <RefreshCw className="h-4 w-4 text-gray-600" />
-                    </button>
-                  </div>
+          </div>
+        ) : (
+          content.map((item) => (
+            <div key={item.id} className="card p-0 overflow-hidden">
+              {/* Thumbnail */}
+              <div className="relative aspect-[9/16] bg-gray-100">
+                <img
+                  src={item.thumbnail}
+                  alt={item.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <Play className="h-8 w-8 text-white" />
                 </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <pre className="whitespace-pre-wrap text-sm">{content.content}</pre>
-                </div>
-
-                {/* Compliance Check */}
-                {content.complianceIssues.length > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
-                      <span className="font-medium text-yellow-800">Compliance Issues</span>
-                    </div>
-                    <ul className="space-y-2">
-                      {content.complianceIssues.map((issue, index) => (
-                        <li key={index} className="text-sm">
-                          <span className={`font-medium ${
-                            issue.risk === "high" ? "text-red-600" :
-                            issue.risk === "medium" ? "text-yellow-600" :
-                            "text-gray-600"
-                          }`}>
-                            [{issue.risk.toUpperCase()}]
-                          </span>
-                          <span className="text-gray-700 ml-2">"{issue.text}"</span>
-                          <p className="text-xs text-gray-600 mt-1 ml-4">
-                            💡 {issue.suggestion}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
+                {item.is_draft && (
+                  <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
+                    Draft
                   </div>
                 )}
               </div>
-            ))
-          )}
-        </div>
+
+              {/* Content Info */}
+              <div className="p-4">
+                <h3 className="font-medium text-sm mb-2 line-clamp-2">{item.title}</h3>
+                <p className="text-xs text-gray-500 mb-3 line-clamp-2">{item.caption}</p>
+
+                {/* Stats */}
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-3 w-3" />
+                      {item.likes.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="h-3 w-3" />
+                      {item.comments.toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Share className="h-3 w-3" />
+                      {item.shares.toLocaleString()}
+                    </span>
+                  </div>
+                  <button className="p-1 hover:bg-gray-100 rounded">
+                    <MoreHorizontal className="h-3 w-3" />
+                  </button>
+                </div>
+
+                <div className="mt-2 text-xs text-gray-400">
+                  {item.upload_date.toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
+
+      {/* Upload Modal */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-semibold">Upload Content to {selectedPlatform}</h2>
+              <button
+                onClick={() => setIsUploadModalOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form className="p-6 space-y-6">
+              {/* File Upload */}
+              <div>
+                <label className="label block mb-2">Media Files</label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    multiple
+                    accept="video/*,image/*"
+                    className="hidden"
+                    id="file-upload"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setUploadForm({ ...uploadForm, files });
+                    }}
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <FileVideo className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                    <p className="text-xs text-gray-400 mt-1">Video or image files</p>
+                  </label>
+                  {uploadForm.files.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-sm text-green-600">
+                        {uploadForm.files.length} file(s) selected
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="label block mb-2">Title</label>
+                <input
+                  type="text"
+                  className="input w-full"
+                  value={uploadForm.title}
+                  onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                  placeholder="Enter content title"
+                />
+              </div>
+
+              {/* Caption */}
+              <div>
+                <label className="label block mb-2">Caption</label>
+                <textarea
+                  className="input w-full h-24"
+                  value={uploadForm.caption}
+                  onChange={(e) => setUploadForm({ ...uploadForm, caption: e.target.value })}
+                  placeholder="Enter caption..."
+                />
+              </div>
+
+              {/* Settings Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Save as Draft */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="is_draft"
+                    checked={uploadForm.is_draft}
+                    onChange={(e) => setUploadForm({ ...uploadForm, is_draft: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="is_draft" className="ml-2 text-sm">Save as draft</label>
+                </div>
+
+                {/* Private */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="is_private"
+                    checked={uploadForm.is_private}
+                    onChange={(e) => setUploadForm({ ...uploadForm, is_private: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="is_private" className="ml-2 text-sm">Private</label>
+                </div>
+
+                {/* Brand Content */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="brand_content"
+                    checked={uploadForm.brand_content}
+                    onChange={(e) => setUploadForm({ ...uploadForm, brand_content: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="brand_content" className="ml-2 text-sm">Brand content</label>
+                </div>
+
+                {/* Brand Organic */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="brand_organic"
+                    checked={uploadForm.brand_organic}
+                    onChange={(e) => setUploadForm({ ...uploadForm, brand_organic: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="brand_organic" className="ml-2 text-sm">Brand organic</label>
+                </div>
+
+                {selectedPlatform === "tiktok" && (
+                  <>
+                    {/* Disable Duet */}
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="disable_duet"
+                        checked={uploadForm.disable_duet}
+                        onChange={(e) => setUploadForm({ ...uploadForm, disable_duet: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="disable_duet" className="ml-2 text-sm">Disable duet</label>
+                    </div>
+
+                    {/* Disable Stitch */}
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="disable_stitch"
+                        checked={uploadForm.disable_stitch}
+                        onChange={(e) => setUploadForm({ ...uploadForm, disable_stitch: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <label htmlFor="disable_stitch" className="ml-2 text-sm">Disable stitch</label>
+                    </div>
+                  </>
+                )}
+
+                {/* Disable Comments */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="disable_comment"
+                    checked={uploadForm.disable_comment}
+                    onChange={(e) => setUploadForm({ ...uploadForm, disable_comment: e.target.checked })}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="disable_comment" className="ml-2 text-sm">Disable comments</label>
+                </div>
+              </div>
+
+              {/* Video Cover Timestamp */}
+              {selectedPlatform === "tiktok" && (
+                <div>
+                  <label className="label block mb-2">Video Cover Timestamp (ms)</label>
+                  <input
+                    type="number"
+                    className="input w-full"
+                    value={uploadForm.video_cover_timestamp}
+                    onChange={(e) => setUploadForm({ ...uploadForm, video_cover_timestamp: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                  />
+                </div>
+              )}
+
+              {/* Submit Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsUploadModalOpen(false)}
+                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={isUploading}
+                  className="flex-1 btn-primary py-2 flex items-center justify-center"
+                >
+                  {isUploading ? "Uploading..." : "Upload"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -58,7 +58,8 @@ export const UploadService = {
       channelsLogger.debug(`Starting upload for ${files.length} files to channel: ${options.channel}`);
       
       const supabase = db.getClient();
-      const uploadedFiles = [];
+      console.log(supabase);
+      const uploadedFiles = []; 
       const bucket = 'content'; // Supabase storage bucket name
       
       // Upload each file to Supabase storage

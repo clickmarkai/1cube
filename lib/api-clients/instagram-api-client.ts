@@ -116,7 +116,7 @@ export class InstagramApiClient {
     id: string;
   }> {
     try {
-      const apiVersion = 'v21.0';
+      const apiVersion = 'v23.0';
       const requestBody: any = {
         image_url: imageUrl
       };
@@ -135,6 +135,7 @@ export class InstagramApiClient {
       });
 
       if (!response.ok) {
+        console.log('response', response);
         throw new Error(`Instagram media creation failed: ${response.status} ${response.statusText}`);
       }
 
@@ -192,7 +193,7 @@ export class InstagramApiClient {
     id: string;
   }> {
     try {
-      const apiVersion = 'v21.0';
+      const apiVersion = 'v23.0';
       const requestBody = {
         creation_id: creationId
       };
@@ -228,7 +229,8 @@ export class InstagramApiClient {
       'instagram_business_basic',
       'instagram_business_manage_messages',
       'instagram_business_manage_comments',
-      'instagram_business_content_publish'
+      'instagram_business_content_publish',
+      'instagram_content_publish'
     ];
 
     const scopes = scope || defaultScopes;
