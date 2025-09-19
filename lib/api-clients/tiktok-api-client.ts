@@ -181,8 +181,8 @@ export class TikTokApiClient {
 
       console.log('data', data);
 
-      if (data.error) {
-        throw new Error(`TikTok API error: ${data.error.message || 'Unknown error'}`);
+      if (data.error && data.error.code != 'ok') {
+          throw new Error(`TikTok API error: ${data.error.message || 'Unknown error'}`);
       }
 
       return data;
@@ -304,6 +304,8 @@ export class TikTokApiClient {
       'Authorization': `Bearer ${accessToken}`
     };
 
+
+    console.log('request', request);
     return await this.makeRequest(
       '/v2/post/publish/content/init/',
       'POST',
@@ -371,7 +373,7 @@ export class TikTokApiClient {
       },
       source_info: {
         source: 'PULL_FROM_URL',
-        photo_cover_index: options?.photoCoverIndex || 1,
+        photo_cover_index: options?.photoCoverIndex || 0,
         photo_images: photoUrls
       },
       post_mode: options?.postMode || 'DIRECT_POST',
