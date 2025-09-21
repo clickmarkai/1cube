@@ -131,7 +131,8 @@ export class TikTokChannel extends BaseChannel {
     const defaultScopes = [
       'user.info.basic',
       'video.publish',
-      'video.upload'
+      'video.upload',
+      'video.list',
     ];
 
     const scopes = params.scopes && params.scopes.length > 0 ? params.scopes : defaultScopes;
@@ -162,6 +163,137 @@ export class TikTokChannel extends BaseChannel {
     // TODO: Implement TikTok-specific order fetching
     channelsLogger.debug(`Fetching orders from ${this.getName()}...`);
     return [];
+  }
+
+  async getVideos(userId: string, options?: { maxCount?: number; cursor?: number }): Promise<any> {
+    try {
+      channelsLogger.debug(`Fetching videos from ${this.getName()} for user ${userId}...`);
+      
+      // Get user's access token for TikTok
+      const accessToken = await this.getUserAccessToken(userId);
+      if (!accessToken) {
+        return {
+          success: false,
+          error: "No TikTok access token found. Please connect your TikTok account first.",
+          videos: [],
+          platform: 'TikTok'
+        };
+      }
+      
+      // Create request parameters for TikTok API
+      const request = {
+        max_count: options?.maxCount || 20,
+        cursor: options?.cursor
+      };
+
+      // Call TikTok API to get video list
+      const response = await this.apiClient.getVideoList(accessToken, request);
+      
+      channelsLogger.info(`✅ Successfully fetched ${response.data.videos.length} videos from TikTok for user ${userId}`);
+      
+      return {
+        success: true,
+        videos: response.data.videos,
+        cursor: response.data.cursor,
+        hasMore: response.data.has_more,
+        totalCount: response.data.videos.length,
+        platform: 'TikTok'
+      };
+      
+    } catch (error) {
+      channelsLogger.error(`❌ Failed to fetch videos from TikTok for user ${userId}:`, error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error fetching videos',
+        videos: [],
+        platform: 'TikTok'
+      };
+    }
+  }
+
+  async getAllVideos(userId: string): Promise<any> {
+    try {
+      channelsLogger.debug(`Fetching ALL videos from ${this.getName()} for user ${userId}...`);
+      
+      // Get user's access token for TikTok
+      const accessToken = await this.getUserAccessToken(userId);
+      if (!accessToken) {
+        return {
+          success: false,
+          error: "No TikTok access token found. Please connect your TikTok account first.",
+          videos: [],
+          totalCount: 0,
+          platform: 'TikTok'
+        };
+      }
+      
+      const allVideos: any[] = [];
+      let cursor: number | undefined = undefined;
+      let hasMore = true;
+      let pageCount = 0;
+      const maxPages = 100; // Safety limit to prevent infinite loops
+      
+      while (hasMore && pageCount < maxPages) {
+        try {
+          // Create request parameters for TikTok API
+          const request = {
+            max_count: 20, // Use maximum allowed per page
+            cursor: cursor
+          };
+
+          // Call TikTok API to get video list
+          const response = await this.apiClient.getVideoList(accessToken, request);
+          
+          // Add videos from this page to our collection
+          if (response.data.videos && response.data.videos.length > 0) {
+            allVideos.push(...response.data.videos);
+            channelsLogger.debug(`📄 Page ${pageCount + 1}: Fetched ${response.data.videos.length} videos (Total so far: ${allVideos.length})`);
+          }
+          
+          // Update pagination info
+          cursor = response.data.cursor;
+          hasMore = response.data.has_more;
+          pageCount++;
+          
+          // Small delay between requests to be respectful to the API
+          if (hasMore) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+        } catch (pageError) {
+          channelsLogger.error(`❌ Error fetching page ${pageCount + 1}:`, pageError);
+          // Continue with partial results rather than failing completely
+          break;
+        }
+      }
+      
+      if (pageCount >= maxPages) {
+        channelsLogger.warn(`⚠️ Reached maximum page limit (${maxPages}) when fetching all videos for user ${userId}`);
+      }
+      
+      channelsLogger.info(`✅ Successfully fetched ${allVideos.length} total videos from TikTok for user ${userId} (${pageCount} pages)`);
+      
+      return {
+        success: true,
+        videos: allVideos,
+        totalCount: allVideos.length,
+        pageCount: pageCount,
+        platform: 'TikTok',
+        note: pageCount >= maxPages ? 'Results may be incomplete due to page limit' : undefined
+      };
+      
+    } catch (error) {
+      channelsLogger.error(`❌ Failed to fetch all videos from TikTok for user ${userId}:`, error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error fetching all videos',
+        videos: [],
+        totalCount: 0,
+        platform: 'TikTok'
+      };
+    }
   }
 
   async upload(files: File[], options: any): Promise<any> {

@@ -67,6 +67,8 @@ export abstract class BaseChannel {
   abstract sync(): Promise<void>;
   abstract getProducts(shopId: string, accessToken: string, options?: any): Promise<any[]>;
   abstract getOrders(): Promise<any[]>;
+  abstract getVideos(userId: string, options?: { maxCount?: number; cursor?: number }): Promise<any>;
+  abstract getAllVideos(userId: string): Promise<any>;
   abstract upload(files: File[], options: any): Promise<any>;
 
   // Token management abstract methods
@@ -216,10 +218,10 @@ export abstract class BaseChannel {
     if (customRedirectUri) {
       return customRedirectUri;
     }
-    return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
+    // return `https://1cube.netlify.app/api/callback/auth/${this.channelName.toLowerCase()}/`;
     
     // For Faster Debugging, use this instead of the above
-    // return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
+    return `http://localhost:3000/api/callback/auth/${this.channelName.toLowerCase()}/`;
     // return `${process.env.BASE_URL || 'http://localhost:3000'}/api/callback/auth/${this.channelName.toLowerCase()}`;
   }
 
