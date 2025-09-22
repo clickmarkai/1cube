@@ -80,6 +80,90 @@ export interface PhotoPublishInitResponse {
   };
 }
 
+export interface VideoListRequest {
+  max_count?: number;
+  cursor?: number;
+  fields?: string[];
+}
+
+export interface TikTokVideo {
+  id: string;
+  create_time?: number;
+  cover_image_url: string;
+  share_url?: string;
+  video_description?: string;
+  duration?: number;
+  height?: number;
+  width?: number;
+  title: string;
+  embed_html?: string;
+  embed_link?: string;
+  like_count?: number;
+  comment_count?: number;
+  share_count?: number;
+  view_count?: number;
+}
+
+export interface VideoListResponse {
+  data: {
+    videos: TikTokVideo[];
+    cursor?: number;
+    has_more: boolean;
+  };
+  error: {
+    code: string;
+    message: string;
+    log_id: string;
+  };
+}
+
+// Predefined field sets for common use cases
+export const TIKTOK_VIDEO_FIELDS = {
+  // All available fields from TikTokVideo model
+  ALL: [
+    'id',
+    'create_time',
+    'cover_image_url',
+    'share_url',
+    'video_description',
+    'duration',
+    'height',
+    'width',
+    'title',
+    'embed_html',
+    'embed_link',
+    'like_count',
+    'comment_count',
+    'share_count',
+    'view_count'
+  ],
+  // Basic info only
+  BASIC: [
+    'id',
+    'title',
+    'cover_image_url',
+    'create_time'
+  ],
+  // Full display info for UI
+  DISPLAY: [
+    'id',
+    'title',
+    'cover_image_url',
+    'create_time',
+    'duration',
+    'like_count',
+    'comment_count',
+    'share_count',
+    'view_count'
+  ],
+  // Minimal for listings
+  MINIMAL: [
+    'id',
+    'title',
+    'cover_image_url'
+  ]
+} as const;
+
 export class TikTokApiClient {
   private config: TikTokConfig;
 
@@ -379,5 +463,44 @@ export class TikTokApiClient {
       post_mode: options?.postMode || 'DIRECT_POST',
       media_type: 'PHOTO'
     };
+  }
+
+  async getVideoList(
+    accessToken: string,
+    request?: VideoListRequest
+  ): Promise<VideoListResponse> {
+    const headers = {
+      'Authorization': `Bearer ${accessToken}`
+    };
+
+    // Default fields matching TikTokVideo model
+    const defaultFields = TIKTOK_VIDEO_FIELDS.ALL;
+
+    // Create query parameters
+    const queryParams: Record<string, any> = {};
+    // Use provided fields or default to all TikTokVideo fields
+    const fieldsToUse = request?.fields || defaultFields;
+    queryParams.fields = fieldsToUse.join(',');
+
+    // Create request body, excluding null/undefined values
+    const body: Record<string, any> = {};
+    if (request?.max_count !== undefined && request.max_count !== null) {
+      body.max_count = request.max_count;
+    }
+    if (request?.cursor !== undefined && request.cursor !== null) {
+      body.cursor = request.cursor;
+    }
+
+    console.log('queryParams', queryParams);
+    console.log('body', body);
+
+    return await this.makeRequest(
+      '/v2/video/list/',
+      'POST',
+      queryParams,
+      Object.keys(body).length > 0 ? body : {},
+      headers,
+      'https://open.tiktokapis.com'
+    );
   }
 }
