@@ -12,6 +12,7 @@ export { ChannelRepository, ChannelService, ChannelTypesService } from './channe
 export { TeamChannelRepository, TeamChannelService } from './team-channel-repository';
 export { TeamUserRepository, TeamUserService } from './team-user-repository';
 export { SessionRepository } from './session-repository';
+export { CreativeLabRepository } from './creative-lab-repository';
 
 // Type exports
 export type { ChannelType } from './channel-repository';
@@ -24,3 +25,4 @@ export * from './channel-repository';
 export * from './team-channel-repository';
 export * from './team-user-repository';
 export * from './session-repository';
+export * from './creative-lab-repository';
