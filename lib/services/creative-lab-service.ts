@@ -46,21 +46,6 @@ export class CreativeLabService {
   }
 
   /**
-   * Add a single asset to an existing creative lab session
-   */
-  async addAsset(
-    sessionId: string,
-    asset: { asset: string; asset_type: string; prompt?: string | null }
-  ): Promise<CreativeLabAsset | null> {
-    try {
-      return await this.repo.addAsset(sessionId, asset);
-    } catch (err) {
-      this.log.error('Failed to add asset to session', err);
-      return null;
-    }
-  }
-
-  /**
    * Generate an image from prompt and attach it to an existing session
    */
   async generateImageInSession(
