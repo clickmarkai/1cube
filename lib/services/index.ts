@@ -18,3 +18,7 @@ export {
   type UploadOptions,
   type UploadResult,
 } from "./upload-service";
+
+export {
+  CreativeLabService,
+} from "./creative-lab-service";
