@@ -39,55 +39,12 @@ export class TikTokChannel extends BaseChannel {
     this.sessionRepository = new SessionRepository();
   }
 
-  async extractCredentials(params: Record<string, string>): Promise<ChannelCredentials> {
-    try {
-      // Get the code verifier from team_channel database
-      const verification = await this.sessionRepository.verifySessionState(params.state);
-      if (!verification.valid || !verification.userId) {
-        throw new Error('Invalid OAuth state or missing user information');
-      }
 
-      const sessionCodeVerifier = await this.sessionRepository.getCodeVerifier(params.state);
-      const codeVerifier = sessionCodeVerifier || undefined;
 
-      if (!codeVerifier) {
-        throw new Error('Code verifier not found in team_channel database or session storage');
-      }
-
-      // Create token map for getToken method
-      const tokenMap = new Map<string, string>();
-      tokenMap.set('code', params.code);
-      tokenMap.set('state', params.state);
-      tokenMap.set('redirect_uri', this.getRedirectUri());
-      tokenMap.set('code_verifier', codeVerifier);
-
-      channelsLogger.info('🔑 TikTok extractCredentials - Token map:', tokenMap);
-
-      // Call getToken to exchange authorization code for access tokens
-      const tokenResponse = await this.getToken(tokenMap);
-
-      // Return credentials with actual tokens
-      return {
-        api_key: params.code, // Keep original code for reference
-        token: tokenResponse.access_token,
-        refresh_token: tokenResponse.refresh_token,
-        code_verifier: codeVerifier,
-        token_expired_at: tokenResponse.token_expired_at,
-        refresh_token_expired_at: tokenResponse.refresh_token_expired_at,
-        token_type: 'Bearer',
-        scope: params.scope || params.scopes,
-        state: params.state
-      };
-    } catch (error) {
-      channelsLogger.error('❌ Failed to extract TikTok credentials:', error);
-      
-      // Fallback to just returning the authorization code if token exchange fails
-      return {
-        api_key: params.code,
-        state: params.state,
-        scope: params.scope || params.scopes
-      };
-    }
+  extractCredentials(params: Record<string, string>): ChannelCredentials {
+    return {
+      api_key: params.code
+    };
   }
 
   async validateSpecificParams(params: Record<string, string>): Promise<{ valid: boolean; error?: string }> {

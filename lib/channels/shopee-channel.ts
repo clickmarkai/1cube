@@ -35,7 +35,9 @@ export class ShopeeChannel extends BaseChannel {
     super('shopee', config);
   }
 
-  async extractCredentials(params: Record<string, string>): Promise<ChannelCredentials> {
+
+
+  extractCredentials(params: Record<string, string>): ChannelCredentials {
     return {
       shop_id: params.shop_id,
       api_key: params.code, // Shopee uses 'code' as API key from OAuth
@@ -119,52 +121,39 @@ export class ShopeeChannel extends BaseChannel {
       let hasNextPage = true;
 
       while (hasNextPage) {
-        const timestamp = Math.floor(Date.now() / 1000);
-        const apiPath = "/api/v2/product/get_item_list";
-
-        // Generate signature
-        const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
-        const signature = crypto
-          .createHmac('sha256', this.PARTNER_KEY)
-          .update(baseString)
-          .digest('hex');
-
         // Build query parameters
-        const queryParams = new URLSearchParams({
-          partner_id: this.PARTNER_ID.toString(),
-          sign: signature,
-          timestamp: timestamp.toString(),
+        const queryParams: Record<string, any> = {
           shop_id: shopId,
           access_token: accessToken,
           offset: offset.toString(),
           page_size: pageSize.toString(),
           item_status: itemStatus
-        });
+        };
 
         // Add optional date filters if provided
         if (options?.updateTimeFrom) {
-          queryParams.set('update_time_from', options.updateTimeFrom.toString());
+          queryParams.update_time_from = options.updateTimeFrom.toString();
         }
         if (options?.updateTimeTo) {
-          queryParams.set('update_time_to', options.updateTimeTo.toString());
+          queryParams.update_time_to = options.updateTimeTo.toString();
         }
 
-        // Prepare the API URL
-        const url = `${this.HOST}${apiPath}?${queryParams.toString()}`;
-
-        // Make the GET request
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Get products request failed: ${response.status} ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
+        // Make the GET request using base method
+        const responseData = await this.makeAuthenticatedRequest(
+          this.HOST,
+          "/api/v2/product/get_item_list",
+          this.PARTNER_ID.toString(),
+          (requestOptions) => {
+            // Shopee uses HMAC-SHA256 with partner_id + path + timestamp
+            const baseString = `${this.PARTNER_ID}${new URL(requestOptions.uri).pathname}${requestOptions.qs.timestamp}`;
+            return crypto
+              .createHmac('sha256', this.PARTNER_KEY)
+              .update(baseString)
+              .digest('hex');
+          },
+          'GET',
+          queryParams
+        );
         
         // Check for API error
         if (responseData.error) {
@@ -219,44 +208,31 @@ export class ShopeeChannel extends BaseChannel {
       for (let i = 0; i < itemIds.length; i += MAX_ITEMS_PER_REQUEST) {
         const batchItemIds = itemIds.slice(i, i + MAX_ITEMS_PER_REQUEST);
         
-        const timestamp = Math.floor(Date.now() / 1000);
-        const apiPath = "/api/v2/product/get_item_base_info";
-
-        // Generate signature
-        const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
-        const signature = crypto
-          .createHmac('sha256', this.PARTNER_KEY)
-          .update(baseString)
-          .digest('hex');
-
         // Build query parameters
-        const queryParams = new URLSearchParams({
-          partner_id: this.PARTNER_ID.toString(),
-          sign: signature,
-          timestamp: timestamp.toString(),
+        const queryParams: Record<string, any> = {
           shop_id: shopId,
           access_token: accessToken,
           item_id_list: batchItemIds.join(','),
           need_tax_info: (options?.needTaxInfo ?? true).toString(),
           need_complaint_policy: (options?.needComplaintPolicy ?? true).toString()
-        });
+        };
 
-        // Prepare the API URL
-        const url = `${this.HOST}${apiPath}?${queryParams.toString()}`;
-
-        // Make the GET request
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Get product details request failed: ${response.status} ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
+        // Make the GET request using base method
+        const responseData = await this.makeAuthenticatedRequest(
+          this.HOST,
+          "/api/v2/product/get_item_base_info",
+          this.PARTNER_ID.toString(),
+          (requestOptions) => {
+            // Shopee uses HMAC-SHA256 with partner_id + path + timestamp
+            const baseString = `${this.PARTNER_ID}${new URL(requestOptions.uri).pathname}${requestOptions.qs.timestamp}`;
+            return crypto
+              .createHmac('sha256', this.PARTNER_KEY)
+              .update(baseString)
+              .digest('hex');
+          },
+          'GET',
+          queryParams
+        );
         
         // Check for API error
         if (responseData.error) {
@@ -437,9 +413,6 @@ export class ShopeeChannel extends BaseChannel {
 
   async getToken(tokenMap: Map<string, string>): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     try {
-      const timestamp = Math.floor(Date.now() / 1000);
-      const apiPath = "/api/v2/auth/token/get";
-      
       // Get shop_id and code from the tokenMap
       const shopId = tokenMap.get('shop_id');
       const code = tokenMap.get('code');
@@ -448,36 +421,29 @@ export class ShopeeChannel extends BaseChannel {
         throw new Error('Missing shop_id or code in tokenMap');
       }
 
-      // Generate signature
-      const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
-      const signature = crypto
-        .createHmac('sha256', this.PARTNER_KEY)
-        .update(baseString)
-        .digest('hex');
-
-      // Prepare the API URL
-      const url = `${this.HOST}${apiPath}?partner_id=${this.PARTNER_ID}&sign=${signature}&timestamp=${timestamp}`;
-      
       // Prepare the request body
       const requestBody = {
         shop_id: parseInt(shopId),
         code: code
       };
 
-      // Make the POST request
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Make the POST request using base method
+      const tokenData = await this.makeAuthenticatedRequest(
+        this.HOST,
+        "/api/v2/auth/token/get",
+        this.PARTNER_ID.toString(),
+        (requestOptions) => {
+          // Shopee uses HMAC-SHA256 with partner_id + path + timestamp
+          const baseString = `${this.PARTNER_ID}${new URL(requestOptions.uri).pathname}${requestOptions.qs.timestamp}`;
+          return crypto
+            .createHmac('sha256', this.PARTNER_KEY)
+            .update(baseString)
+            .digest('hex');
         },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Token request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const tokenData = await response.json();
+        'POST',
+        {}, // No query params needed
+        requestBody
+      );
       
       channelsLogger.info(`✅ Successfully retrieved Shopee token for shop ${shopId}`);
       
@@ -544,23 +510,10 @@ export class ShopeeChannel extends BaseChannel {
 
   private async _refreshShopeeToken(shopId: string, refreshToken: string): Promise<{access_token: string, refresh_token?: string, token_expired_at?: Date, refresh_token_expired_at?: Date}> {
     try {
-      const timestamp = Math.floor(Date.now() / 1000);
-      const apiPath = "/api/v2/auth/access_token/get";
-      
       if (!shopId || !refreshToken) {
         throw new Error('Missing shop_id or refresh_token');
       }
 
-      // Generate signature
-      const baseString = `${this.PARTNER_ID}${apiPath}${timestamp}`;
-      const signature = crypto
-        .createHmac('sha256', this.PARTNER_KEY)
-        .update(baseString)
-        .digest('hex');
-
-      // Prepare the API URL
-      const url = `${this.HOST}${apiPath}?partner_id=${this.PARTNER_ID}&sign=${signature}&timestamp=${timestamp}`;
-      
       // Prepare the request body
       const requestBody = {
         partner_id: this.PARTNER_ID,
@@ -568,20 +521,23 @@ export class ShopeeChannel extends BaseChannel {
         refresh_token: refreshToken
       };
 
-      // Make the POST request
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Make the POST request using base method
+      const tokenData = await this.makeAuthenticatedRequest(
+        this.HOST,
+        "/api/v2/auth/access_token/get",
+        this.PARTNER_ID.toString(),
+        (requestOptions) => {
+          // Shopee uses HMAC-SHA256 with partner_id + path + timestamp
+          const baseString = `${this.PARTNER_ID}${new URL(requestOptions.uri).pathname}${requestOptions.qs.timestamp}`;
+          return crypto
+            .createHmac('sha256', this.PARTNER_KEY)
+            .update(baseString)
+            .digest('hex');
         },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Refresh token request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const tokenData = await response.json();
+        'POST',
+        {}, // No query params needed
+        requestBody
+      );
       
       channelsLogger.info(`✅ Successfully refreshed Shopee token for shop ${shopId}`);
       
