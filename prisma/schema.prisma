@@ -12,18 +12,40 @@ datasource db {
 
 // User and Authentication
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String          @id @default(cuid())
+  email         String          @unique
   name          String?
   password      String?
-  role          String    @default("user") // owner, admin, editor, viewer
+  role          String          @default("user")
   teamId        String?
-  team          Team?     @relation(fields: [teamId], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  team          Team?           @relation(fields: [teamId], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   campaigns     Campaign[]
   insights      Insight[]
+  brandProducts BrandProduct[]
+}
+
+model BrandProduct {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  user        User?    @relation(fields: [userId], references: [id])
+  sourceUrl   String   @map("source_url")
+  url         String?  @map("url")
+  name        String
+  title       String?
+  description String?
+  price       Float?   @map("price")
+  priceText   String?  @map("price_text")
+  currency    String?
+  category    String?
+  sku         String?
+  images      Json?
+  attributes  Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("brand_products")
+  @@index([userId], map: "brand_products_user_id_idx")
 }
 
 model Team {

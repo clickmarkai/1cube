@@ -176,7 +176,7 @@ function LoginForm() {
           </p>
 
           <p className="mt-4 text-center text-sm text-gray-400">
-            v0.0.1
+            v0.0.9
           </p>
         </div>
       </div>

@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -61,15 +63,24 @@ export default function RegisterPage() {
     }
   };
 
+  // If already authenticated, redirect to app to avoid showing register page
   useEffect(() => {
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("session") : null;
-      if (raw) {
-        router.replace("/app");
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (status === "authenticated") {
+      router.replace("/app");
+    }
+  }, [status, router]);
+
+  // Show loading while session is being checked
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-lighter via-white to-primary-light flex items-center justify-center px-4 py-8">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If already logged in, avoid showing register page
   // (e.g., user navigates back after login)

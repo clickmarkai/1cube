@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { InstantNav } from "../../components/ui/InstantNavigation";
 import { usePrefetchRoutes } from "../../hooks/usePrefetchRoutes";
+import BrandOnboardingModal from "@/components/BrandOnboardingModal";
+// Lazy import to avoid type resolution issues during build
 import { PerformanceMonitor } from "../../components/PerformanceMonitor";
 import { NavigationDebugger } from "../../components/NavigationDebugger";
 import { RouterDebugger } from "../../components/RouterDebugger";
@@ -52,7 +54,9 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showBrandModal, setShowBrandModal] = useState(false);
   const { data: session, status } = useSession();
+  const [onboardingSnapshot, setOnboardingSnapshot] = useState<any>(null);
  
   appLogger.debug('🏗️ ClientLayout rendering for pathname:', pathname);
   appLogger.debug('🔐 Session status:', status, 'Session:', session);
@@ -70,6 +74,34 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
       return () => clearTimeout(timer);
     }
   }, [status, router]);
+
+  // After login: query Supabase to check if brand is connected for this user
+  useEffect(() => {
+    const checkBrand = async () => {
+      if (status !== "authenticated" || !session?.user?.email) return;
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+        // Look for any brand voice rows for this user
+        const { data, error } = await supabase
+          .from('brand_voice')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .limit(1);
+        if (error) throw error;
+        const hasBrand = Array.isArray(data) && data.length > 0;
+        const stored = typeof window !== "undefined" ? localStorage.getItem("brand-onboarding-snapshot") : null;
+        const snapshot = stored ? JSON.parse(stored) : null;
+        const completed = snapshot?.status === "completed";
+        setOnboardingSnapshot(snapshot);
+        setShowBrandModal(!completed || !hasBrand);
+      } catch (e) {
+        // On error, default to showing modal to ensure onboarding can proceed
+        setShowBrandModal(true);
+      }
+    };
+    checkBrand();
+  }, [status, session]);
 
   // Show loading while session is being checked
   if (status === "loading") {
@@ -228,6 +260,24 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         <main className="flex-1 p-6">{children}</main>
       </div>
+
+      {/* Brand Onboarding Modal */}
+      <BrandOnboardingModal
+        isOpen={showBrandModal}
+        initialSnapshot={onboardingSnapshot}
+        initialStep={onboardingSnapshot?.step ?? "brand_url"}
+        onClose={() => {
+          setShowBrandModal(false);
+        }}
+        onProgress={(_, snapshot) => {
+          localStorage.setItem("brand-onboarding-snapshot", JSON.stringify(snapshot));
+        }}
+        onCompleted={(snapshot) => {
+          localStorage.setItem("brand-onboarding-snapshot", JSON.stringify(snapshot));
+          setOnboardingSnapshot(snapshot);
+          setShowBrandModal(false);
+        }}
+      />
     </div>
   );
 }
